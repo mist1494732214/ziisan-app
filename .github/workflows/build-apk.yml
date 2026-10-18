@@ -62,6 +62,10 @@ jobs:
         run: |
           set -euo pipefail
           ls -lh android/app/build/outputs/apk/release/
+          if ls android/app/build/outputs/apk/release/ | grep -qi unsigned; then
+            echo "::error::产出是 unsigned 包 —— 签名没生效（检查 Secrets 与 signingConfig）"
+            exit 1
+          fi
           mkdir -p out
           cp android/app/build/outputs/apk/release/*.apk out/ziisan-android.apk
           python3 - <<'PY'
