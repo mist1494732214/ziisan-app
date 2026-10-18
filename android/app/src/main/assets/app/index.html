@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!-- 手机只读端：只读知识库，没有任何写/执行入口（后端也只实现 GET）。
+     两种数据源：①局域网直连电脑（实时）②GitHub 私有仓库的离线包（不依赖电脑开机）。
+     单文件外壳 + 极简依赖（marked 走本机 vendor，不引任何 CDN）—— 手机可能在无外网的局域网里打开。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#23384E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="籽三">
+<title>籽三 · 学习库（只读）</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <button id="back" class="icon" hidden aria-label="返回">‹</button>
+  <div class="title">
+    <strong id="ttl">籽三 · 学习库</strong>
+    <span id="sub" class="sub">只读 · 正在连接…</span>
+  </div>
+  <button id="refresh" class="icon" aria-label="刷新">⟳</button>
+  <button id="src" class="icon" aria-label="数据源">☁</button>
+  <span id="net" class="net" title="网络状态">…</span>
+</header>
+
+<main id="main">
+  <section id="home" class="view">
+    <div class="searchbar">
+      <input id="q" type="search" inputmode="search" placeholder="搜知识点（如：凋亡、酸碱平衡）">
+      <button id="qbtn" class="btn">搜</button>
+    </div>
+    <div id="stats" class="stats"></div>
+    <div id="courses" class="courses"><div class="loading">正在读知识库…</div></div>
+    <div id="searchHits" class="hits" hidden></div>
+  </section>
+
+  <section id="chapter" class="view" hidden>
+    <div class="tabs">
+      <button class="tab on" data-tab="note">知识点笔记</button>
+      <button class="tab" data-tab="qa">思考题解析</button>
+      <button class="tab" data-tab="kps">知识点列表</button>
+      <button class="tab" data-tab="practice">练习</button>
+      <button class="tab" data-tab="deep">深度学习</button>
+    </div>
+    <article id="content" class="md"></article>
+  </section>
+</main>
+
+<!-- 扫码登录（相机 + jsQR 本地解码，不依赖外部 App） -->
+<div id="scan" class="sheet scan" hidden>
+  <div class="sheet-card">
+    <h3>扫码登录</h3>
+    <p class="hint">对准电脑上那张二维码。扫到后<b>自动填好一切</b>，不用输入任何东西。</p>
+    <div class="scanbox"><video id="scanVideo" playsinline muted></video>
+      <div class="scanline"></div></div>
+    <div id="scanMsg" class="hint">正在打开相机…</div>
+    <div class="row">
+      <button id="scanClose" class="btn ghost">关闭</button>
+    </div>
+    <p class="hint">相机权限若被拒：手机设置 → 应用 → 籽三 → 权限 → 相机 → 允许；或用「添加到主屏幕」的浏览器版再扫。</p>
+  </div>
+</div>
+
+<!-- 首次启动的登录卡（A 方案：粘一次只读令牌；令牌只存本机） -->
+<div id="login" class="sheet login" hidden>
+  <div class="sheet-card">
+    <h3>籽三 · 手机学习库</h3>
+    <p class="hint">第一次用：把下面三项填好，<b>粘一次只读令牌</b>；以后打开就直接用，不用再登录。
+      课程内容会从你的 <b>私有</b> GitHub 仓库拉下来，存在手机上，<b>断网也能看</b>。</p>
+    <input id="lgOwner" placeholder="GitHub 用户名（如 mist1494732214）" autocapitalize="off" autocomplete="username">
+    <input id="lgRepo" placeholder="仓库名（如 medkb-private）" autocapitalize="off">
+    <input id="lgToken" type="password" placeholder="只读令牌（Fine-grained · Contents: Read）" autocapitalize="off" autocomplete="off">
+    <p class="hint">令牌只存在这台手机的浏览器里。建议去 GitHub 建一个
+      <b>Fine-grained token</b>，只勾 <b>这一个仓库</b> 的 <b>Contents: Read-only</b>。</p>
+    <p class="hint">嫌麻烦？在<b>电脑上</b>运行 <code>python mobile-app/make_qr.py</code>，
+      用手机<b>扫一下二维码</b>——用户名、仓库、令牌、模型 Key 会<b>一次填好</b>，你什么都不用输入。</p>
+    <div class="row">
+      <button id="lgScan" class="btn">📷 扫码登录（不用填）</button>
+    </div>
+    <div class="row">
+      <button id="lgGo" class="btn ghost">用上面的信息登录</button>
+      <button id="lgLan" class="btn ghost">改用局域网</button>
+    </div>
+    <div id="lgStatus" class="hint"></div>
+  </div>
+</div>
+
+<!-- 数据源设置（M2）：局域网 / GitHub 私有仓库 -->
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-card">
+    <h3>数据源</h3>
+    <label class="opt"><input type="radio" name="mode" value="pc"> 局域网直连电脑（实时，需电脑开着）</label>
+    <label class="opt"><input type="radio" name="mode" value="gh"> GitHub 离线包（不依赖电脑开机）</label>
+    <div id="ghFields" class="gh" hidden>
+      <input id="owner" placeholder="GitHub 用户名（如 mist1494732214）" autocapitalize="off">
+      <input id="repo" placeholder="仓库名（如 medkb-private）" autocapitalize="off">
+      <input id="branch" placeholder="分支（默认 master）" autocapitalize="off">
+      <input id="token" type="password" placeholder="只读令牌（Fine-grained · Contents: Read）" autocapitalize="off">
+      <div class="hint">令牌只存在本机浏览器里。建议在 GitHub 建一个 <b>只给这个仓库 Contents:Read</b> 的
+        Fine-grained token —— 就算泄露也读不到别的仓库、改不了任何东西。</div>
+    </div>
+    <div class="row">
+      <button id="saveSet" class="btn">保存并切换</button>
+      <button id="syncNow" class="btn ghost">立即同步全部</button>
+      <button id="closeSet" class="btn ghost">关闭</button>
+    </div>
+    <div id="setStatus" class="hint"></div>
+  </div>
+</div>
+
+<script src="vendor/marked.umd.js"></script>
+<script src="vendor/jsQR.js"></script>
+<script src="prompts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

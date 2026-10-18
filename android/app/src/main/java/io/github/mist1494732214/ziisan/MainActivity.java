@@ -12,7 +12,13 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
+import java.util.Map;
+import java.util.HashMap;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -30,7 +36,10 @@ import android.webkit.WebViewClient;
  */
 public class MainActivity extends Activity {
 
-    private static final String HOME = "https://mist1494732214.github.io/ziisan-app/";
+    // 内置知识库版：页面与数据都在 assets 里，用虚拟 https 域加载（无需登录、无需联网）
+    private static final String LOCAL_HOST = "ziisan.local";
+    private static final String HOME = "https://ziisan.local/index.html";
+    private static final String REMOTE_HOME = "https://mist1494732214.github.io/ziisan-app/";
     private WebView web;
     private boolean bakedInjected = false;
 
@@ -62,6 +71,29 @@ public class MainActivity extends Activity {
             }
         });
         web.setWebViewClient(new WebViewClient() {
+            /** 虚拟域 → APK 内 assets（app/ 与 kb/） */
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+                Uri u = req.getUrl();
+                if (u == null || !LOCAL_HOST.equals(u.getHost())) return null;   // 其它域走网络
+                String path = u.getPath();
+                if (path == null || path.equals("/") || path.isEmpty()) path = "/index.html";
+                // /_kb/... → assets/kb/... ；其余 → assets/app/...
+                String asset = path.startsWith("/_kb/")
+                        ? "kb/" + path.substring("/_kb/".length())
+                        : "app" + path;
+                try {
+                    InputStream is = getAssets().open(asset);
+                    Map<String, String> hdrs = new HashMap<>();
+                    hdrs.put("Cache-Control", "no-store");
+                    return new WebResourceResponse(mimeOf(asset), "utf-8", 200, "OK", hdrs, is);
+                } catch (IOException e) {
+                    return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found",
+                            new HashMap<String, String>(),
+                            new ByteArrayInputStream("".getBytes()));
+                }
+            }
+
             @Override
             public void onPageFinished(WebView view, String url) {
                 // 内置凭据走 localStorage 注入，不依赖地址栏 fragment：
@@ -83,8 +115,8 @@ public class MainActivity extends Activity {
                 Uri u = req.getUrl();
                 String host = u.getHost() == null ? "" : u.getHost();
                 // 站内（含 GitHub API 与 GitHub 登录/令牌页）留在 WebView；其它交给系统浏览器
-                if (host.endsWith("github.io") || host.equals("api.github.com")
-                        || host.equals("github.com")) {
+                if (host.equals(LOCAL_HOST) || host.endsWith("github.io")
+                        || host.equals("api.github.com") || host.equals("github.com")) {
                     return false;
                 }
                 try {
@@ -106,6 +138,19 @@ public class MainActivity extends Activity {
         web.loadUrl(target);
         setContentView(web, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private static String mimeOf(String path) {
+        String p = path.toLowerCase();
+        if (p.endsWith(".html")) return "text/html";
+        if (p.endsWith(".js")) return "text/javascript";
+        if (p.endsWith(".css")) return "text/css";
+        if (p.endsWith(".json")) return "application/json";
+        if (p.endsWith(".webmanifest")) return "application/manifest+json";
+        if (p.endsWith(".svg")) return "image/svg+xml";
+        if (p.endsWith(".png")) return "image/png";
+        if (p.endsWith(".woff2")) return "font/woff2";
+        return "application/octet-stream";
     }
 
     /** 申请相机权限（API 23+ 是运行时权限；拒绝也不崩，只是扫码用不了） */
