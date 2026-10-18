@@ -8,24 +8,28 @@
    "bytes": 3396445,
    "packs": [
     {
-     "file": "pack/病理学__1.json",
+     "file": "pack/p01.json",
      "sha256": "333b43bbcb5769ff65b25b07af8e968c67b8a13af197ccf842dd180d69d210b8",
-     "bytes": 809561
+     "bytes": 809561,
+     "origin": "pack/病理学__1.json"
     },
     {
-     "file": "pack/病理学__2.json",
+     "file": "pack/p02.json",
      "sha256": "9b13b723ff5f4ddd9a06418c559e996115bdc1448d565b07890b193b96f03d55",
-     "bytes": 865150
+     "bytes": 865150,
+     "origin": "pack/病理学__2.json"
     },
     {
-     "file": "pack/病理学__3.json",
+     "file": "pack/p03.json",
      "sha256": "2e3c3d8f4d777b1790158ef1ddce6a431dfe85473c9cac2b7bf55fc4a25a5f4d",
-     "bytes": 816984
+     "bytes": 816984,
+     "origin": "pack/病理学__3.json"
     },
     {
-     "file": "pack/病理学__4.json",
+     "file": "pack/p04.json",
      "sha256": "6c8b2bd21088946a637e9d6872a585e90742940e14ee6ce1469afde13f39b6b6",
-     "bytes": 904750
+     "bytes": 904750,
+     "origin": "pack/病理学__4.json"
     }
    ]
   },
@@ -35,29 +39,34 @@
    "bytes": 3971681,
    "packs": [
     {
-     "file": "pack/病理生理学__1.json",
+     "file": "pack/p01.json",
      "sha256": "b98c44c36594dae0408abc9df54864214b7b947b887b6ae6231c0aeece7045bd",
-     "bytes": 809554
+     "bytes": 809554,
+     "origin": "pack/病理生理学__1.json"
     },
     {
-     "file": "pack/病理生理学__2.json",
+     "file": "pack/p02.json",
      "sha256": "ff435568b8401750b9955a50f46aa48dd491c16ac6eeb2c066e5c4be0c1ca1e6",
-     "bytes": 807525
+     "bytes": 807525,
+     "origin": "pack/病理生理学__2.json"
     },
     {
-     "file": "pack/病理生理学__3.json",
+     "file": "pack/p03.json",
      "sha256": "0524ba94792a38e89489769f9d4e92ac148084e629baf9c049548976263a125b",
-     "bytes": 871100
+     "bytes": 871100,
+     "origin": "pack/病理生理学__3.json"
     },
     {
-     "file": "pack/病理生理学__4.json",
+     "file": "pack/p04.json",
      "sha256": "6699d7fa4ae25dfa77631dbd5e3abec9acc71c5db58df37d4d1c59a5ad46f9ed",
-     "bytes": 705180
+     "bytes": 705180,
+     "origin": "pack/病理生理学__4.json"
     },
     {
-     "file": "pack/病理生理学__5.json",
+     "file": "pack/p05.json",
      "sha256": "e91b0e63a7eca35cb00cb8fb895265798d71b6e53efdc807be99f585f439c96e",
-     "bytes": 778322
+     "bytes": 778322,
+     "origin": "pack/病理生理学__5.json"
     }
    ]
   }
