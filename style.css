@@ -120,3 +120,50 @@ main{padding:12px;max-width:820px;margin:0 auto}
   border-radius:10px;background:var(--bg);color:var(--fg);font-size:16px}
 .sheet.login .row{margin-top:14px}
 .sheet.login .hint{margin:8px 0 0}
+
+/* ── 练习（离线挖空/选择题/五联卡）────────────────────────────── */
+.pbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.pbtn{font:inherit;font-size:13px;padding:6px 12px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.pbtn.on{background:var(--accent-weak,#e8eef8);border-color:var(--brand,#4a6fa5);font-weight:700}
+.pbtn.pri{background:linear-gradient(135deg,#5C8FC4,#CE5F97);color:#fff;border-color:transparent;font-weight:700}
+.pscore{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.pn{font-size:12.5px;color:var(--muted);margin:6px 2px}
+.qcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.cloze{font-size:15px;line-height:2.3;color:var(--fg)}
+.blk{font:inherit;font-size:14px;width:auto;min-width:64px;padding:2px 6px;text-align:center;
+  border:0;border-bottom:2px solid #b9c9e0;border-radius:4px 4px 0 0;background:#f2f6fc;color:#2b4a6f;font-weight:700}
+.blk:focus{outline:none;border-bottom-color:#4a6fa5;background:#fff}
+.blk.ok{border-bottom-color:#3f8f6f;background:#e9f6ef;color:#2f6b53}
+.blk.bad{border-bottom-color:#c05a72;background:#fbeef1;color:#9c394f}
+.stem{font-size:15px;font-weight:650;line-height:1.8;margin-bottom:10px}
+.opt{display:block;width:100%;text-align:left;font:inherit;font-size:14px;line-height:1.7;
+  padding:10px 12px;margin:7px 0;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.opt b{color:#4a6fa5;margin-right:8px}
+.opt.ok{border-color:#3f8f6f;background:#e9f6ef}
+.opt.bad{border-color:#c05a72;background:#fbeef1}
+.exp{margin-top:10px;font-size:13px;line-height:1.7;color:var(--muted);
+  border-left:3px solid #c8d6e8;padding-left:10px}
+.pacts{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.pmsg{font-size:12.5px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:8px 0;overflow:hidden}
+.card>summary{padding:10px 12px;font-weight:700;font-size:14px;cursor:pointer;list-style:none}
+.card>summary::-webkit-details-marker{display:none}
+.cf{padding:6px 12px;font-size:13px;line-height:1.7}
+.cf>span{display:block;font-size:11.5px;color:var(--muted);margin-bottom:2px}
+.cf>p{margin:0}
+.cf textarea{width:100%;font:inherit;font-size:13px;line-height:1.65;padding:7px 9px;
+  border:1px solid var(--line);border-radius:8px;background:#fffdf5;color:var(--fg);resize:vertical}
+
+/* ── 深度学习（离线 8 阶段 + 五联卡 + 清单）────────────────────── */
+.dlhead{font-size:12.5px;color:var(--muted);background:var(--card);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px;margin:10px 0;line-height:1.7}
+.dlsec{font-size:12px;font-weight:700;color:var(--muted);margin:14px 2px 6px;letter-spacing:.02em}
+.stages{display:flex;flex-direction:column;gap:4px}
+.st{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:10px;
+  background:var(--card);border:1px solid var(--line);font-size:13px;line-height:1.6}
+.st input{margin:3px 0 0;accent-color:#4a6fa5;flex:0 0 auto}
+.st .min{color:#4a6fa5;font-weight:700;flex:0 0 auto;font-size:12px;padding-top:1px}
+.st.on .tx{color:var(--muted);text-decoration:line-through}
+.stact{margin:-2px 0 6px 26px}
+.dlhint{font-size:11.5px;color:var(--muted);line-height:1.6}

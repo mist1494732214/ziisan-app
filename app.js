@@ -188,7 +188,8 @@
     return ghCourse(course, onProgress).then(function (chs) {
       var hit = chs.filter(function (x) { return x.name === chapter; })[0];
       if (!hit) throw new Error('包里没有这一章：' + chapter);
-      return { ok: true, course: course, chapter: chapter, note: hit.note || '', qa: hit.qa || '', kps: hit.kps || [] };
+      return { ok: true, course: course, chapter: chapter, note: hit.note || '', qa: hit.qa || '',
+               kps: hit.kps || [], exercises: hit.exercises || {} };
     });
   }
   function doSearchApi(term) {
@@ -284,6 +285,10 @@
         if (k.section && k.section !== sec) { sec = k.section; head = '<h3>' + esc(sec) + '</h3>'; }
         return head + '<p><strong>' + esc(k.name) + '</strong>' + (k.en ? '（' + esc(k.en) + '）' : '') + '</p>';
       }).join('') : '<div class="empty">这一章没有按「一、二、」编号的知识点。<br>可能是早期模板写的，或这是一张章级总图 —— 正文在「知识点笔记」页签里仍可读。</div>';
+    } else if (tab === 'practice') {
+      el.innerHTML = renderPractice();
+    } else if (tab === 'deep') {
+      el.innerHTML = renderDeep();
     } else {
       el.innerHTML = d.note ? md(d.note) : '<div class="empty">这一章还没有 知识点笔记.md</div>';
     }
@@ -460,6 +465,231 @@
     }).then(function () { $('#lgGo').disabled = false; });
   }
 
+
+  // ══════════════════════════════════════════════════════════════════
+  //  练习（离线）：挖空 / 选择题 / 闪卡 —— 数据来自离线包的 exercises
+  // ══════════════════════════════════════════════════════════════════
+  var PR = { game: 'cloze', ci: 0, picked: -1, right: 0, total: 0, showAns: {} };
+
+  function exercises() {
+    return (state.data && state.data.exercises) || {};
+  }
+  function norm(s) {
+    return String(s || '').toLowerCase()
+      .replace(/[\s　]/g, '').replace(/[，,。；;、：:（）()]/g, '')
+      .replace(/[－—–~～]/g, '-');
+  }
+
+  function renderPractice() {
+    var ex = exercises();
+    var g = PR.game;
+    var html = '<div class="pbar">' +
+      ['cloze', 'choice', 'cards'].map(function (k) {
+        var name = { cloze: '挖空', choice: '选择题', cards: '五联卡' }[k];
+        return '<button class="pbtn' + (g === k ? ' on' : '') + '" data-pg="' + k + '">' + name + '</button>';
+      }).join('') +
+      (g === 'choice' ? '<span class="pscore">答对 ' + PR.right + ' / ' + PR.total + '</span>' : '') +
+      '</div>';
+    if (g === 'cloze') html += pCloze(ex.cloze || []);
+    else if (g === 'choice') html += pChoice(ex.choice || []);
+    else html += pCards(ex.cards || []);
+    return html;
+  }
+
+  function pCloze(items) {
+    if (!items.length) return '<div class="empty">这一章还没有挖空题（需要更完整的笔记标签）</div>';
+    var i = Math.min(PR.ci, items.length - 1);
+    var it = items[i];
+    var parts = String(it.text).split(/\{\{(\d+)\}\}/);
+    var body = '';
+    parts.forEach(function (seg) {
+      if (/^\d+$/.test(seg)) {
+        var k = Number(seg), want = (it.answers || [])[k] || '';
+        body += '<input class="blk" data-idx="' + k + '" size="' + Math.max(5, Math.min(12, want.length + 1)) +
+          '" autocomplete="off" autocapitalize="off" spellcheck="false">';
+      } else if (seg) body += esc(seg);
+    });
+    return '<div class="pn">第 ' + (i + 1) + ' / ' + items.length + ' 题' +
+      (it.kp ? '　<b>' + esc(it.kp) + '</b>' : '') + '</div>' +
+      '<div class="qcard"><div class="cloze">' + body + '</div>' +
+      '<div class="pacts"><button class="pbtn pri" data-pcheck="1">对答案</button>' +
+      '<button class="pbtn" data-pnext="1">下一题 →</button>' +
+      '<span class="pmsg" id="pmsg"></span></div></div>';
+  }
+
+  function pChoice(items) {
+    if (!items.length) return '<div class="empty">这一章还没有选择题</div>';
+    var i = Math.min(PR.ci, items.length - 1);
+    var it = items[i];
+    var done = PR.picked >= 0;
+    var opts = (it.options || []).map(function (o, k) {
+      var cls = 'opt';
+      if (done) {
+        if (k === it.answerIndex) cls += ' ok';
+        else if (k === PR.picked) cls += ' bad';
+      }
+      return '<button class="' + cls + '" data-pick="' + k + '"><b>' + 'ABCD'[k] + '</b>' +
+        esc(o) + '</button>';
+    }).join('');
+    return '<div class="pn">第 ' + (i + 1) + ' / ' + items.length + ' 题</div>' +
+      '<div class="qcard"><div class="stem">' + esc(it.stem) + '</div>' + opts +
+      (done ? '<div class="exp">' + esc(it.explain || '') + '</div>' : '') +
+      '<div class="pacts">' + (done ? '<button class="pbtn pri" data-pnext="1">下一题 →</button>' : '') +
+      '</div></div>';
+  }
+
+  function pCards(cards) {
+    if (!cards.length) return '<div class="empty">这一章还没有五联卡素材</div>';
+    var F = [['cause', '病因/诱因'], ['mechanism', '关键机制'], ['gross', '大体'],
+             ['micro', '镜下'], ['clinic', '临床联系'], ['outcome', '结局/转归'], ['confuse', '易混点']];
+    return '<div class="pn">' + cards.length + ' 张（点开看；在「深度学习」里可以填写）</div>' +
+      cards.map(function (c, i) {
+        return '<details class="card"' + (i === 0 ? ' open' : '') + '><summary>' + esc(c.kp) + '</summary>' +
+          F.map(function (f) {
+            var v = c[f[0]];
+            return v ? '<div class="cf"><span>' + f[1] + '</span><p>' + esc(v) + '</p></div>' : '';
+          }).join('') + '</details>';
+      }).join('');
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  深度学习（离线）：8 阶段 + 五联卡填写 + 检查清单
+  // ══════════════════════════════════════════════════════════════════
+  function dlKey() { return 'zs_dl_' + (state.course || '') + '|' + (state.chapter || ''); }
+  function dlLoad() {
+    try { return JSON.parse(localStorage.getItem(dlKey()) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function dlSave(d) { try { localStorage.setItem(dlKey(), JSON.stringify(d)); } catch (e) {} }
+
+  function renderDeep() {
+    var plan = (exercises().plan) || {};
+    var cards = exercises().cards || [];
+    var d = dlLoad();
+    var F = [['cause', '病因/诱因'], ['mechanism', '关键机制'], ['gross', '大体'],
+             ['micro', '镜下'], ['clinic', '临床联系'], ['outcome', '结局/转归'], ['confuse', '易混点']];
+
+    var doneStages = (plan.stages || []).filter(function (s) { return (d.stages || {})[s.key]; }).length;
+    var filled = 0;
+    cards.forEach(function (c) {
+      var e = (d.cards || {})[c.kp] || {};
+      if (F.some(function (f) { return (e[f[0]] || '').trim(); })) filled++;
+    });
+
+    var html = '<div class="dlhead">' + esc(plan.type || '') +
+      '　首轮 <b>' + (plan.totalMin || 0) + '</b> 分钟（紧就压到 ' + (plan.shortTotal || 0) + '）' +
+      '　·　阶段 <b>' + doneStages + '/' + (plan.stages || []).length + '</b>' +
+      '　·　五联卡 <b>' + filled + '/' + cards.length + '</b></div>';
+
+    html += '<div class="dlsec">八阶段（勾掉就是做完了）</div><div class="stages">';
+    (plan.stages || []).forEach(function (s) {
+      var on = !!(d.stages || {})[s.key];
+      var act = '';
+      if (s.action && s.action.kind === 'practice') {
+        act = '<button class="pbtn" data-go="' + esc(s.action.game) + '">' + '去练 →' + '</button>';
+      } else if (s.action && s.action.text) {
+        act = '<div class="dlhint">' + esc(s.action.text) + '</div>';
+      }
+      html += '<label class="st' + (on ? ' on' : '') + '"><input type="checkbox" data-st="' + esc(s.key) + '"' +
+        (on ? ' checked' : '') + '><span class="min">' + s.min + '′</span>' +
+        '<span class="tx"><b>' + esc(s.name) + '</b> ' + esc(s.what) + '</span></label>' +
+        (act ? '<div class="stact">' + act + '</div>' : '');
+    });
+    html += '</div>';
+
+    html += '<div class="dlsec">五联卡（把空的填上，存在手机里）</div>';
+    cards.forEach(function (c, i) {
+      var e = (d.cards || {})[c.kp] || {};
+      html += '<details class="card"' + (i === 0 ? ' open' : '') + '><summary>' + esc(c.kp) + '</summary>' +
+        F.map(function (f) {
+          var v = (e[f[0]] != null ? e[f[0]] : (c[f[0]] || ''));
+          return '<div class="cf"><span>' + f[1] + '</span>' +
+            '<textarea rows="2" data-dl="' + esc(c.kp) + '" data-f="' + f[0] + '" ' +
+            'placeholder="（待补）">' + esc(v) + '</textarea></div>';
+        }).join('') + '</details>';
+    });
+
+    html += '<div class="dlsec">完成检查清单</div>';
+    (plan.checklist || []).forEach(function (ck) {
+      var on = !!(d.checklist || {})[ck.key];
+      html += '<label class="st' + (on ? ' on' : '') + '"><input type="checkbox" data-ck="' + esc(ck.key) + '"' +
+        (on ? ' checked' : '') + '><span class="tx">' + esc(ck.text) + '</span></label>';
+    });
+    return html;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  事件：练习 / 深度学习 的交互
+  // ══════════════════════════════════════════════════════════════════
+  function bindPracticeDeep() {
+    var box = $('#content');
+    if (!box) return;
+
+    box.addEventListener('click', function (e) {
+      var t = e.target;
+      // 玩法切换
+      var pg = t.getAttribute && t.getAttribute('data-pg');
+      if (pg) { PR.game = pg; PR.ci = 0; PR.picked = -1; renderTab('practice'); return; }
+      // 挖空：对答案 / 下一题
+      if (t.getAttribute && t.getAttribute('data-pcheck')) {
+        var inputs = box.querySelectorAll('input.blk');
+        var items = exercises().cloze || [];
+        var it = items[Math.min(PR.ci, items.length - 1)] || { answers: [] };
+        var ok = 0, bad = 0;
+        Array.prototype.forEach.call(inputs, function (inp) {
+          var k = Number(inp.getAttribute('data-idx'));
+          var want = (it.answers || [])[k] || '';
+          if (!inp.value.trim()) { inp.className = 'blk'; return; }
+          if (norm(inp.value) === norm(want)) { inp.className = 'blk ok'; ok++; }
+          else { inp.className = 'blk bad'; inp.title = '答案：' + want; bad++; }
+        });
+        var msg = $('#pmsg');
+        if (msg) msg.textContent = bad ? ('对 ' + ok + '、错 ' + bad + '（红框点一下看答案）') : ('✓ 全对（' + ok + '）');
+        return;
+      }
+      if (t.getAttribute && t.getAttribute('data-pnext')) {
+        PR.ci += 1; PR.picked = -1;
+        renderTab(PR.game === 'choice' ? 'practice' : 'practice');
+        return;
+      }
+      // 选择题：选一项
+      var pick = t.getAttribute && t.getAttribute('data-pick');
+      if (pick != null && PR.picked < 0) {
+        var arr = exercises().choice || [];
+        var item = arr[Math.min(PR.ci, arr.length - 1)];
+        PR.picked = Number(pick);
+        PR.total += 1;
+        if (PR.picked === item.answerIndex) PR.right += 1;
+        renderTab('practice');
+        return;
+      }
+      // 深度学习：跳到练习玩法
+      var go = t.getAttribute && t.getAttribute('data-go');
+      if (go) { PR.game = (go === 'choice' ? 'choice' : 'cloze'); PR.ci = 0; PR.picked = -1; renderTab('practice'); return; }
+    });
+
+    box.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t || t.type !== 'checkbox') return;
+      var d = dlLoad();
+      var st = t.getAttribute('data-st'), ck = t.getAttribute('data-ck');
+      if (st) { d.stages = d.stages || {}; d.stages[st] = t.checked; }
+      if (ck) { d.checklist = d.checklist || {}; d.checklist[ck] = t.checked; }
+      dlSave(d);
+      var row = t.closest('label');
+      if (row) row.classList.toggle('on', t.checked);
+    });
+
+    box.addEventListener('input', function (e) {
+      var t = e.target;
+      if (!t || t.tagName !== 'TEXTAREA' || !t.getAttribute('data-dl')) return;
+      var d = dlLoad();
+      var kp = t.getAttribute('data-dl'), f = t.getAttribute('data-f');
+      d.cards = d.cards || {}; d.cards[kp] = d.cards[kp] || {};
+      d.cards[kp][f] = t.value;
+      dlSave(d);
+    });
+  }
+
   // ── 启动 ─────────────────────────────────────────────────────────
   readToken();
 
@@ -471,6 +701,8 @@
     listTree: listTree, getChapter: getChapter, search: doSearchApi,
     packPath: packPath, state: state
   };
+
+  bindPracticeDeep();
 
   if (needLogin()) {
     showLogin();
