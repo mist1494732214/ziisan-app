@@ -1,7 +1,6 @@
 name: build-apk
 
 # 云端构建安卓 APK（公开仓库，Actions 免费）
-# 触发：① 手动（workflow_dispatch）② 改动 android/ 或本文件时自动
 on:
   workflow_dispatch:
   push:
@@ -14,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write               # 建 Release 用
+    env:
+      GRADLE_VER: '8.7'
     steps:
       - uses: actions/checkout@v4
 
@@ -22,24 +23,29 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # ⚠ 不用 runner 预装的 Gradle（当前是 9.x），也不用 wrapper 生成：
+      #   AGP 8.1.4 依赖的 DependencyHandler.module() 在 Gradle 9 已移除，
+      #   而 Gradle 9 在**配置阶段**加载 AGP 就抛 NoSuchMethodError，连 `gradle wrapper` 都跑不了。
+      #   所以直接下载一个 Gradle 8.7 用（2026-10-18 实测）。
+      - name: 安装 Gradle ${{ env.GRADLE_VER }}
+        run: |
+          set -euo pipefail
+          cd "$HOME"
+          curl -fsSL -o gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VER}-bin.zip"
+          unzip -q gradle.zip
+          echo "$HOME/gradle-${GRADLE_VER}/bin" >> "$GITHUB_PATH"
+          "$HOME/gradle-${GRADLE_VER}/bin/gradle" --version | head -6
+
       - name: 环境自检
         run: |
           java -version
-          gradle --version | head -6
           echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME" | head
-
-      # ⚠ 必须钉 Gradle 版本：ubuntu-latest 预装的是 Gradle 9.x，
-      #   而 AGP 8.1.4 依赖的 DependencyHandler.module() 在 Gradle 9 已被移除，
-      #   直接用系统 gradle 会报 NoSuchMethodError（2026-10-18 实测踩到）。
-      #   用 wrapper 钉 8.7 即可复现本地/CI 一致的环境。
-      - name: 生成 Gradle wrapper（钉 8.7）
-        working-directory: android
-        run: gradle wrapper --gradle-version 8.7 --distribution-type bin --no-daemon
+          ls "$ANDROID_HOME/platforms" 2>/dev/null | head || true
+          ls "$ANDROID_HOME/build-tools" 2>/dev/null | head || true
 
       - name: 构建 debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: 收集 APK
         run: |
