@@ -1,4 +1,14 @@
 # 籽三 · 手机学习库（App 壳）
+## 安卓安装包（APK）
+
+不想用浏览器，就装 APK：**https://github.com/mist1494732214/ziisan-app/releases/latest/download/ziisan-android.apk**
+
+- 这个 APK 只是一个**壳**（WebView + 图标，约 10 KB），加载的就是上面的 Pages 页面；
+  内容仍由你的只读令牌从私有仓库拉取。
+- 安装：手机浏览器打开上面的链接下载 → 允许「安装未知来源应用」→ 安装 → 打开。
+- 源码：本仓库 `android/`；每次推送自动用 GitHub Actions 构建（`.github/workflows/build-apk.yml`）。
+- 想自己重新打包：仓库 → Actions → build-apk → Run workflow，构建完在 Releases 里下载。
+
 
 这是**界面壳**，不含任何知识库内容、不含密钥。手机装好后，用你自己的**只读令牌**
 去读你私有的 `medkb-private` 仓库，内容存在手机上，断网也能看。
