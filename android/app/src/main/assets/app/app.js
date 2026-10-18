@@ -329,9 +329,28 @@
     }
   }
 
+  /** 宽屏：让左栏滚到并高亮当前章节（平板才需要） */
+  function focusInTree(course, chapter) {
+    if (!WIDE) return;
+    var rows = document.querySelectorAll('#courses .ch');
+    var hit = null;
+    Array.prototype.forEach.call(rows, function (r) {
+      r.classList.remove('on');
+      if (r.dataset.course === course && r.dataset.chapter === chapter) hit = r;
+    });
+    if (!hit) return;
+    hit.classList.add('on');
+    var d = hit.closest('details');
+    if (d) d.open = true;                     // 展开所在课程
+    try { hit.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+
   function openChapter(course, chapter) {
     state.course = course; state.chapter = chapter; state.tab = 'note';
-    $('#home').hidden = true; $('#chapter').hidden = false; $('#back').hidden = false;
+    focusInTree(course, chapter);
+    // 平板（宽屏）：左侧课程树常驻，只切换右侧
+    if (!WIDE) $('#home').hidden = true;
+    $('#chapter').hidden = false; $('#back').hidden = !WIDE;
     $('#ttl').textContent = chapter;
     $('#sub').textContent = course + ' · ' + srcLabel();
     document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('on', t.dataset.tab === 'note'); });
@@ -368,7 +387,8 @@
   }
 
   function goHome() {
-    $('#chapter').hidden = true; $('#home').hidden = false; $('#back').hidden = true;
+    $('#chapter').hidden = true; $('#home').hidden = false;
+    $('#back').hidden = !WIDE;
     $('#ttl').textContent = '籽三 · 学习库';
     $('#sub').textContent = '只读 · ' + srcLabel();
   }
@@ -1169,17 +1189,18 @@
       '　·　阶段 <b>' + doneStages + '/' + (plan.stages || []).length + '</b>' +
       '　·　五联卡 <b>' + filled + '/' + cards.length + '</b></div>';
 
-    // 接模型区（仅局域网模式）：讲 + 纠错
-    if (pcMode() && cards.length) {
-      html += '<div class="dlsec">让籽三讲 / 纠错（需要电脑开着）</div>' +
+    // 接模型区（电脑走局域网 / 内置版直连）
+    if ((pcMode() || modelReady()) && cards.length) {
+      html += '<div class="dlsec">让籽三讲 / 纠错（' +
+        (pcMode() ? '走电脑，不花钱' : '需要联网') + '）</div>' +
         '<div class="chhead"><select id="dpKp" class="chsel">' +
         cards.map(function (c) { return '<option value="' + esc(c.kp) + '">' + esc(c.kp) + '</option>'; }).join('') +
         '</select><button class="pbtn pri" id="dpExplain">讲一遍</button>' +
         '<button class="pbtn" id="dpGrade">提交作答·纠错</button></div>' +
         '<div id="dpOut" class="dpout">' + (DEEP.out ? md(DEEP.out) : '') + '</div>' +
-        '<textarea id="dpAns" class="chinput" rows="3" placeholder="把你的作答写这里，再点「提交作答·纠错」">' +
+        '<textarea id="dpAns" class="chinput" rows="3" placeholder="在这里写你的作答">' +
         esc(DEEP.ans || '') + '</textarea>';
-    } else if (!pcMode()) {
+    } else if (!pcMode() && !modelReady()) {
       html += '<div class="dlnote">讲解与纠错要调模型，只在「电脑开着 + 局域网模式」下可用；' +
         '这里的五联卡、阶段、清单都可以离线做。</div>';
     }
