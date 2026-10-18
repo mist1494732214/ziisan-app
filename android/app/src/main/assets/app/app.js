@@ -1321,6 +1321,15 @@
 
   bindPracticeDeep();
 
+  // 内置模型凭据（APK 打包时注入 baked.js）：让考官/费曼/讲纠错开箱可用
+  (function applyBakedModel() {
+    var bk = window.ZS_BAKED;
+    if (!bk || !bk.k) return;
+    if (settings().apiKey) return;                    // 用户自己填过就不覆盖
+    saveSettings({ apiKey: bk.k, apiBase: bk.b || '', apiModel: bk.m || '',
+                   apiKind: bk.a || 'account' });
+  })();
+
   // 内置凭据：壳会把 base64 载荷直接写进 localStorage（不依赖地址栏）
   var baked = '';
   try { baked = localStorage.getItem('zs_baked') || ''; } catch (e) {}
