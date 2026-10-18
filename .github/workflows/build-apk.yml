@@ -1,0 +1,58 @@
+name: build-apk
+
+# 云端构建安卓 APK（公开仓库，Actions 免费）
+# 触发：① 手动（workflow_dispatch）② 改动 android/ 或本文件时自动
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest          # 自带 Android SDK 与 Gradle
+    permissions:
+      contents: write               # 建 Release 用
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 打印工具版本
+        run: |
+          java -version
+          gradle --version | head -5
+          echo "ANDROID_HOME=$ANDROID_HOME"
+
+      - name: 构建 debug APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: 收集 APK
+        run: |
+          ls -lh android/app/build/outputs/apk/debug/
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/*.apk "out/ziisan-android.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ziisan-android-apk
+          path: out/ziisan-android.apk
+
+      # 手动触发时顺手发一个 Release，手机上点链接就能下（不用登录 GitHub）
+      - name: 发布到 Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: 籽三 APK #${{ github.run_number }}
+          body: |
+            安卓安装包（WebView 壳，加载 https://mist1494732214.github.io/ziisan-app/）。
+
+            安装：手机浏览器打开本 Release 的 `ziisan-android.apk` 下载 → 允许「安装未知来源应用」→ 安装。
+            首次打开会要求填 GitHub 用户名/仓库/只读令牌（详见仓库 README）。
+          files: out/ziisan-android.apk

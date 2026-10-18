@@ -1,0 +1,36 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.mist1494732214.ziisan'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "io.github.mist1494732214.ziisan"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.1"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        debug {
+            // debug 包由 Gradle 自动签名（debug keystore），可以直接侧载安装
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+// 这个壳**不引任何依赖**：只有 Activity + WebView，装完体积小、也没有第三方库要审。

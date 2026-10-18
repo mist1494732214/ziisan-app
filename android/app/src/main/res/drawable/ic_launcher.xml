@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用图标：渐变圆角方块 + 「籽」字形留白的极简标记（矢量，任何分辨率都清晰） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 底板 -->
+    <path
+        android:pathData="M24,4 L84,4 A20,20 0 0 1 104,24 L104,84 A20,20 0 0 1 84,104 L24,104 A20,20 0 0 1 4,84 L4,24 A20,20 0 0 1 24,4 Z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="4"
+                android:startY="4"
+                android:endX="104"
+                android:endY="104">
+                <item android:offset="0" android:color="#5C8FC4" />
+                <item android:offset="1" android:color="#CE5F97" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 中央竖条 + 横笔：像一枚书签，也像「籽」的笔画骨架 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,26 L56,26 L56,82 L52,82 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,40 L74,40 L74,45 L34,45 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,60 L72,60 L72,65 L36,65 Z" />
+</vector>

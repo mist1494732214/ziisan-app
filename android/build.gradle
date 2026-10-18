@@ -1,0 +1,4 @@
+// 籽三 · 手机学习库（安卓壳）—— 顶层构建脚本
+plugins {
+    id 'com.android.application' version '8.1.4' apply false
+}
