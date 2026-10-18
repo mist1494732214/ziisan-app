@@ -279,3 +279,18 @@ main{padding:12px;max-width:820px;margin:0 auto}
   .tabs { gap: 6px 6px; flex-wrap: wrap; overflow-x: visible; row-gap: 6px; }
   .tabs .tab { padding: 6px 10px; font-size: 12.5px; }
 }
+
+/* 离线深度学习的判定卡 */
+.dpoff{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+  font-size:14px;line-height:1.85;max-height:52vh;overflow:auto}
+.dpask{font-size:14.5px;line-height:1.8;margin-bottom:8px}
+.offres{margin-top:10px;border-radius:12px;padding:11px 13px;font-size:13.5px;line-height:1.8;
+  border:1px solid var(--line);background:var(--card)}
+.offres.ok{border-color:#3f8f6f;background:#eef8f2}
+.offres.mid{border-color:#b98c3a;background:#fdf7e9}
+.offres.bad{border-color:#c05a72;background:#fbeef1}
+.offres .vd{font-size:14px}
+.offres .kw{margin-top:4px;color:var(--muted)}
+.offres .kw.miss{color:#a3512e}
+.offres .std{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+.offres .std p{margin:4px 0 0}

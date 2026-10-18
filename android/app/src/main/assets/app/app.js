@@ -1164,6 +1164,117 @@
     }).catch(function (e) { DEEP.busy = false; DEEP.out = '⚠ ' + e.message; renderTab('deep'); });
   }
 
+  // ── 离线深度学习：讲 → 问 → 答 → 纠（全程不联网，本地判分）──────────
+  var OFF = { kp: '', stage: '', out: '', last: null };
+
+  function offItems() {
+    var ex = exercises();
+    return (ex.offline || []).slice();
+  }
+
+  function offItem(kp) {
+    var list = offItems();
+    return list.filter(function (x) { return x.kp === kp; })[0] || list[0] || null;
+  }
+
+  function offVerdict(hit, total) {
+    if (!total) return '参考';
+    if (hit >= total) return '对';
+    if (hit / total >= 0.5) return '部分对';
+    return '错';
+  }
+
+  /** 本地判分：把学生的作答与「必答关键词」比对（忽略大小写/空格/标点） */
+  function offScore(answer, terms) {
+    var norm = function (s) {
+      return String(s || '').toLowerCase().replace(/[\s　]/g, '')
+        .replace(/[，,。；;、：:（）()"'“”‘’]/g, '');
+    };
+    var txt = norm(answer);
+    var hit = [], miss = [];
+    (terms || []).forEach(function (t) {
+      var k = norm(t);
+      if (!k) return;
+      if (txt.indexOf(k) >= 0) hit.push(t); else miss.push(t);
+    });
+    return { hit: hit, miss: miss, total: (terms || []).length };
+  }
+
+  function offHtml() {
+    var list = offItems();
+    if (!list.length) {
+      return '<div class="dlnote">这一章暂时没有离线讲解素材（需要更完整的笔记标签）。</div>';
+    }
+    var cur = offItem(OFF.kp);
+    OFF.kp = cur.kp;
+    var sel = '<select id="offKp" class="chsel">' + list.map(function (x) {
+      return '<option value="' + esc(x.kp) + '"' + (x.kp === OFF.kp ? ' selected' : '') + '>' +
+        esc(x.kp) + '</option>';
+    }).join('') + '</select>';
+
+    var body = '';
+    if (OFF.stage === 'explain' || OFF.stage === '') {
+      body = '<div class="dpoff">' + (OFF.out ? md(OFF.out) : md(cur.explain || '（无）')) + '</div>';
+    } else if (OFF.stage === 'ask' || OFF.stage === 'graded') {
+      var parts = String(cur.skeleton || '').split(/\{\{(\d+)\}\}/);
+      var sk = '';
+      parts.forEach(function (seg) {
+        if (/^\d+$/.test(seg)) sk += '<input class="blk" data-off="' + seg + '" size="10" autocomplete="off">';
+        else if (seg) sk += esc(seg);
+      });
+      body = '<div class="dpask">' + md(cur.ask || '') + '</div>' +
+        (sk ? '<div class="cloze">' + sk + '</div>' : '') +
+        '<textarea id="offAns" class="chinput" rows="3" placeholder="用自己的话复述一遍（提到关键判别词）">' +
+        (OFF.stage === 'graded' && OFF.last ? esc(OFF.last.answer) : '') + '</textarea>' +
+        (OFF.stage === 'graded' && OFF.last ? offResultHtml() : '');
+    }
+    return '<div class="dlsec">离线学习：讲 → 问 → 答 → 纠（不联网）</div>' +
+      '<div class="chhead">' + sel +
+      '<button class="pbtn" data-off-act="explain">讲一遍</button>' +
+      '<button class="pbtn pri" data-off-act="ask">问我</button>' +
+      (OFF.stage === 'ask' || OFF.stage === 'graded'
+        ? '<button class="pbtn" data-off-act="grade">提交·看对不对</button>' : '') +
+      '</div>' + body;
+  }
+
+  function offResultHtml() {
+    var r = OFF.last || {};
+    var cls = r.verdict === '对' ? 'ok' : (r.verdict === '部分对' ? 'mid' : 'bad');
+    var h = '<div class="offres ' + cls + '">' +
+      '<div class="vd">判定：<b>' + esc(r.verdict) + '</b>　关键词命中 ' + r.hit.length + '/' + r.total + '</div>';
+    if (r.hit.length) h += '<div class="kw">提到了：' + r.hit.map(esc).join('、') + '</div>';
+    if (r.miss.length) h += '<div class="kw miss">漏了：' + r.miss.map(esc).join('、') + '</div>';
+    if (r.canonical) h += '<div class="std"><b>规范表述</b><p>' + esc(r.canonical) + '</p></div>';
+    return h + '</div>';
+  }
+
+  function offAct(act) {
+    var cur = offItem(OFF.kp);
+    if (!cur) return;
+    if (act === 'explain') { OFF.stage = 'explain'; OFF.out = cur.explain || ''; }
+    else if (act === 'ask') { OFF.stage = 'ask'; OFF.last = null; }
+    else if (act === 'grade') {
+      var inputs = document.querySelectorAll('#content input[data-off]');
+      var parts = [];
+      Array.prototype.forEach.call(inputs, function (i) { if (i.value.trim()) parts.push(i.value); });
+      var ta = document.querySelector('#offAns');
+      var answer = parts.join(' ') + ' ' + ((ta && ta.value) || '');
+      var sc = offScore(answer, cur.terms || []);
+      var verdict = offVerdict(sc.hit.length, sc.total);
+      OFF.last = { answer: ((ta && ta.value) || ''), verdict: verdict,
+                   hit: sc.hit, miss: sc.miss, total: sc.total,
+                   canonical: cur.canonical || '' };
+      OFF.stage = 'graded';
+      // 记进度（本地）
+      var d = dlLoad();
+      d.off = d.off || {};
+      d.off[OFF.kp] = { verdict: verdict, hit: sc.hit.length, total: sc.total,
+                        at: new Date().toISOString() };
+      dlSave(d);
+    }
+    renderTab('deep');
+  }
+
   function renderDeep() {
     var plan = (exercises().plan) || {};
     var cards = exercises().cards || [];
@@ -1188,6 +1299,8 @@
       '　首轮 <b>' + (plan.totalMin || 0) + '</b> 分钟（紧就压到 ' + (plan.shortTotal || 0) + '）' +
       '　·　阶段 <b>' + doneStages + '/' + (plan.stages || []).length + '</b>' +
       '　·　五联卡 <b>' + filled + '/' + cards.length + '</b></div>';
+
+    html += offHtml();
 
     // 接模型区（电脑走局域网 / 内置版直连）
     if ((pcMode() || modelReady()) && cards.length) {
@@ -1290,6 +1403,9 @@
       // 考官 / 费曼：开场与发送
       if (t.id === 'chStart') { chatSend(PR.game); return; }
       if (t.id === 'chSend') { chatSend(PR.game); return; }
+      // 离线深度学习：讲 / 问 / 提交
+      var offActName = t.getAttribute && t.getAttribute('data-off-act');
+      if (offActName) { offAct(offActName); return; }
       // 深度学习：讲 / 纠错
       if (t.id === 'dpExplain') { deepCoach('explain'); return; }
       if (t.id === 'dpGrade') { deepCoach('grade'); return; }
@@ -1306,6 +1422,7 @@
 
     box.addEventListener('change', function (e) {
       var t = e.target;
+      if (t && t.id === 'offKp') { OFF.kp = t.value; OFF.stage = ''; OFF.last = null; renderTab('deep'); return; }
       if (t && t.id === 'dlFile' && t.files && t.files[0]) { dlImport(t.files[0]); return; }
       if (!t || t.type !== 'checkbox') return;
       var d = dlLoad();
