@@ -561,6 +561,88 @@
   }
   function dlSave(d) { try { localStorage.setItem(dlKey(), JSON.stringify(d)); } catch (e) {} }
 
+  /** 导出当前这一章的学习进度（JSON，可发给自己/放回电脑） */
+  function dlExport() {
+    var d = dlLoad();
+    var pack = {
+      kind: 'ziisan-deep-progress',
+      version: 1,
+      device: (localStorage.getItem('zs_device') || (function () {
+        var n = 'device-' + Math.random().toString(36).slice(2, 8);
+        try { localStorage.setItem('zs_device', n); } catch (e) {}
+        return n;
+      })()),
+      exportedAt: new Date().toISOString(),
+      course: state.course || '',
+      chapter: state.chapter || '',
+      dl: d
+    };
+    var blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '籽三进度_' + (state.course || '') + '_' + (state.chapter || '') + '.json';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+    dlMsg('已导出到下载目录');
+  }
+
+  function dlMsg(t) {
+    var el = $('#dlmsg');
+    if (el) el.textContent = t || '';
+  }
+
+  /** 把一份进度包合并进本机（按 课程|章节 分键；字段取并集，包里的值优先） */
+  function mergePack(pack) {
+    if (!pack || pack.kind !== 'ziisan-deep-progress') throw new Error('不是籽三的进度包');
+    var key = 'zs_dl_' + (pack.course || '') + '|' + (pack.chapter || '');
+    var cur = {};
+    try { cur = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) {}
+    var inc = pack.dl || {};
+    ['stages', 'checklist', 'goals'].forEach(function (f) {
+      cur[f] = Object.assign({}, cur[f] || {}, inc[f] || {});
+    });
+    var cards = Object.assign({}, cur.cards || {});
+    Object.keys(inc.cards || {}).forEach(function (kp) {
+      cards[kp] = Object.assign({}, cards[kp] || {}, inc.cards[kp] || {});
+    });
+    cur.cards = cards;
+    cur.mergedAt = new Date().toISOString();
+    try { localStorage.setItem(key, JSON.stringify(cur)); } catch (e) {}
+    return key;
+  }
+
+  function dlImport(file) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      try {
+        var pack = JSON.parse(String(fr.result));
+        mergePack(pack);
+        dlMsg('已导入：' + (pack.course || '') + ' / ' + (pack.chapter || ''));
+        renderTab('deep');
+      } catch (e) {
+        dlMsg('导入失败：' + e.message);
+      }
+    };
+    fr.readAsText(file, 'utf-8');
+  }
+
+  /** 从云端（私有仓库的 学习进度/latest.json）恢复所有章节进度 */
+  function dlCloudRestore() {
+    dlMsg('正在读云端进度…');
+    ghFetch('学习进度/latest.json').then(function (txt) {
+      var data = JSON.parse(txt);
+      var list = data.entries || data.items || [];
+      var n = 0;
+      list.forEach(function (e) {
+        try { mergePack(e); n++; } catch (err) {}
+      });
+      dlMsg(n ? ('已恢复 ' + n + ' 条章节进度') : '云端没有可恢复的进度');
+      renderTab('deep');
+    }).catch(function (e) {
+      dlMsg('读不到云端进度：' + e.message);
+    });
+  }
+
   function renderDeep() {
     var plan = (exercises().plan) || {};
     var cards = exercises().cards || [];
@@ -575,7 +657,13 @@
       if (F.some(function (f) { return (e[f[0]] || '').trim(); })) filled++;
     });
 
-    var html = '<div class="dlhead">' + esc(plan.type || '') +
+    var html = '<div class="dlbar">' +
+      '<button class="pbtn" data-dlexp="1">⬇ 导出进度</button>' +
+      '<button class="pbtn" data-dlimp="1">⬆ 导入进度</button>' +
+      '<button class="pbtn" data-dlcloud="1">☁ 从云端恢复</button>' +
+      '<span class="pmsg" id="dlmsg"></span></div>' +
+      '<input type="file" id="dlFile" accept=".json,application/json" hidden>' +
+      '<div class="dlhead">' + esc(plan.type || '') +
       '　首轮 <b>' + (plan.totalMin || 0) + '</b> 分钟（紧就压到 ' + (plan.shortTotal || 0) + '）' +
       '　·　阶段 <b>' + doneStages + '/' + (plan.stages || []).length + '</b>' +
       '　·　五联卡 <b>' + filled + '/' + cards.length + '</b></div>';
@@ -662,6 +750,12 @@
         renderTab('practice');
         return;
       }
+      // 学习进度：导出 / 导入 / 云端恢复
+      if (t.getAttribute && t.getAttribute('data-dlexp')) { dlExport(); return; }
+      if (t.getAttribute && t.getAttribute('data-dlimp')) {
+        var fi = $('#dlFile'); if (fi) fi.click(); return;
+      }
+      if (t.getAttribute && t.getAttribute('data-dlcloud')) { dlCloudRestore(); return; }
       // 深度学习：跳到练习玩法
       var go = t.getAttribute && t.getAttribute('data-go');
       if (go) { PR.game = (go === 'choice' ? 'choice' : 'cloze'); PR.ci = 0; PR.picked = -1; renderTab('practice'); return; }
@@ -669,6 +763,7 @@
 
     box.addEventListener('change', function (e) {
       var t = e.target;
+      if (t && t.id === 'dlFile' && t.files && t.files[0]) { dlImport(t.files[0]); return; }
       if (!t || t.type !== 'checkbox') return;
       var d = dlLoad();
       var st = t.getAttribute('data-st'), ck = t.getAttribute('data-ck');
