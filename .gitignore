@@ -1,0 +1,6 @@
+# 签名钥匙与本地产物 —— 绝不进仓库
+keys/
+out/
+*.jks
+*.keystore
+password.txt

@@ -2,6 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
+// 版本号：versionCode 用 CI 的 run_number（单调递增，手机上才能覆盖升级）；
+// 本地构建没有这个环境变量时回退到 1。
+def vCode = (System.getenv("ZS_VERSION_CODE") ?: "1").toInteger()
+
 android {
     namespace 'io.github.mist1494732214.ziisan'
     compileSdk 34
@@ -10,7 +14,7 @@ android {
         applicationId "io.github.mist1494732214.ziisan"
         minSdk 24
         targetSdk 34
-        versionCode 1
+        versionCode vCode
         versionName "1.0.1"
     }
 
@@ -19,12 +23,30 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    buildTypes {
-        debug {
-            // debug 包由 Gradle 自动签名（debug keystore），可以直接侧载安装
-        }
+    // ★ 固定签名（2026-10-18 加）：debug 包每次构建的签名都不一样，
+    //   发新版会「签名冲突装不上」，只能卸载 → 登录状态与离线包全丢。
+    //   这里用一把固定钥匙签 release 包，钥匙以 base64 存在仓库 Secrets 里（不进仓库）。
+    signingConfigs {
         release {
-            minifyEnabled false
+            def ks = System.getenv("ZS_KEYSTORE")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("ZS_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ZS_KEY_ALIAS") ?: "ziisan"
+                keyPassword System.getenv("ZS_KEY_PASSWORD") ?: System.getenv("ZS_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false          // 壳太小，混淆没有收益
+            if (System.getenv("ZS_KEYSTORE")) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            // 本地调试用
         }
     }
 
