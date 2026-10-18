@@ -484,14 +484,16 @@
     var ex = exercises();
     var g = PR.game;
     var html = '<div class="pbar">' +
-      ['cloze', 'choice', 'cards'].map(function (k) {
-        var name = { cloze: '挖空', choice: '选择题', cards: '五联卡' }[k];
+      ['cloze', 'choice', 'cards', 'socratic', 'feynman'].map(function (k) {
+        var name = { cloze: '挖空', choice: '选择题', cards: '五联卡',
+                     socratic: '考官', feynman: '费曼' }[k];
         return '<button class="pbtn' + (g === k ? ' on' : '') + '" data-pg="' + k + '">' + name + '</button>';
       }).join('') +
       (g === 'choice' ? '<span class="pscore">答对 ' + PR.right + ' / ' + PR.total + '</span>' : '') +
       '</div>';
     if (g === 'cloze') html += pCloze(ex.cloze || []);
     else if (g === 'choice') html += pChoice(ex.choice || []);
+    else if (g === 'socratic' || g === 'feynman') html += pChat(g);
     else html += pCards(ex.cards || []);
     return html;
   }
@@ -536,6 +538,135 @@
       (done ? '<div class="exp">' + esc(it.explain || '') + '</div>' : '') +
       '<div class="pacts">' + (done ? '<button class="pbtn pri" data-pnext="1">下一题 →</button>' : '') +
       '</div></div>';
+  }
+
+  // ── 接模型（仅局域网模式）─────────────────────────────────────────
+  var CH = { msgs: [], busy: false, kind: '' };
+
+  function pcMode() { return servedFromPc(); }
+
+  /** 流式重绘节流（最多 6 次/秒）：一个回答动辄 400+ 事件，逐事件重绘会卡死手机 */
+  var _lastPaint = 0, _paintTimer = null;
+  function throttlePaint(tab, final) {
+    if (final) {
+      if (_paintTimer) { clearTimeout(_paintTimer); _paintTimer = null; }
+      _lastPaint = Date.now();
+      renderTab(tab);
+      return;
+    }
+    var now = Date.now();
+    if (now - _lastPaint >= 160) {
+      _lastPaint = now;
+      renderTab(tab);
+    } else if (!_paintTimer) {
+      _paintTimer = setTimeout(function () {
+        _paintTimer = null;
+        _lastPaint = Date.now();
+        renderTab(tab);
+      }, 170);
+    }
+  }
+
+  /** POST + 逐块解析 SSE（event: x / data: {...}） */
+  function postSSE(path, body, onEvent) {
+    fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          var m = t;
+          try { m = JSON.parse(t).error || t; } catch (e) {}
+          throw new Error(m);
+        });
+      }
+      var reader = res.body.getReader();
+      var dec = new TextDecoder('utf-8');
+      var buf = '';
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) { onEvent('__end', {}); return; }
+          buf += dec.decode(r.value, { stream: true });
+          var i;
+          while ((i = buf.indexOf('\n\n')) >= 0) {
+            var chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+            var name = 'message', data = '';
+            chunk.split('\n').forEach(function (ln) {
+              if (ln.indexOf('event: ') === 0) name = ln.slice(7).trim();
+              else if (ln.indexOf('data: ') === 0) data += ln.slice(6);
+            });
+            try { onEvent(name, data ? JSON.parse(data) : {}); } catch (e) {}
+          }
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (e) { onEvent('error', { message: e.message }); });
+  }
+
+  /** 考官 / 费曼：聊天式多轮，只在本机模式可用（GitHub 模式没有模型） */
+  /** 本章知识点名（考官/费曼/纠错的下拉用）——数据来自章节的 kps 列表 */
+  function kpNames() {
+    var ks = (state.data && state.data.kps) || [];
+    return ks.map(function (k) { return typeof k === 'string' ? k : (k && k.name) || ''; })
+      .filter(function (n) { return !!n; });
+  }
+
+  function pChat(kind) {
+    if (!pcMode()) {
+      return '<div class="empty">考官与费曼要调模型，<b>只能在「电脑开着 + 局域网模式」下用</b>。<br>' +
+        '现在的数据源是 GitHub 离线包（只读静态内容）。<br><br>' +
+        '用法：电脑开着籽三 → 手机浏览器打开电脑上的 <code>/m/?token=…</code> 地址；' +
+        '在那个页面里练习即可（同一条 WiFi）。</div>';
+    }
+    if (CH.kind !== kind) { CH = { msgs: [], busy: false, kind: kind }; }
+    var names = kpNames();
+    var opts = '<option value="">（整章 / 不限）</option>' + names.map(function (n) {
+      return '<option value="' + esc(n) + '">' + esc(n) + '</option>';
+    }).join('');
+    var head = '<div class="chhead"><select id="chKp" class="chsel">' + opts + '</select>' +
+      '<button class="pbtn pri" id="chStart">' + (kind === 'socratic' ? '开始出题' : '开始检验') + '</button></div>';
+    var body = CH.msgs.map(function (m) {
+      if (m.role === 'user') return '<div class="chm u">' + esc(m.text) + '</div>';
+      return '<div class="chm a">' + (m.text ? md(m.text) : '<span class="chwait">思考中…</span>') +
+        (m.think ? '<details class="chthink"><summary>💭 思考（' + m.think.length + ' 字）</summary><pre>' +
+          esc(m.think) + '</pre></details>' : '') + '</div>';
+    }).join('');
+    return head + '<div class="chlog">' + (body || '<div class="empty" style="padding:14px">' +
+      (kind === 'socratic' ? '考官会按本章知识点连续追问，答不上就直说"不会"。'
+                           : '先用你自己的话复述一个知识点，再交卷。') + '</div>') + '</div>' +
+      '<div class="chbar"><textarea id="chIn" class="chinput" rows="2" placeholder="' +
+      (kind === 'socratic' ? '回答考官…' : '写下你的复述…') + '"></textarea>' +
+      '<button class="pbtn pri" id="chSend">发送</button></div>';
+  }
+
+  function chatSend(kind) {
+    if (CH.kind !== kind) CH = { msgs: [], busy: false, kind: kind };
+    if (CH.busy) return;
+    var inp = $('#chIn');
+    var text = (inp && inp.value || '').trim();
+    var kpSel = $('#chKp');
+    var kp = kpSel ? kpSel.value : '';
+    if (!text && CH.msgs.length) return;                  // 只在第一次允许空（开场出题）
+    CH.busy = true;
+    if (text) CH.msgs.push({ role: 'user', text: text });
+    var cur = { role: 'assistant', text: '', think: '' };
+    CH.msgs.push(cur);
+    renderTab('practice');
+    postSSE(kind === 'socratic' ? '/m/api/socratic' : '/m/api/feynman',
+      { text: text, kp: kp, scope: (state.chapter ? ((state.course || '') + ' / ' + state.chapter) : '') },
+      function (ev, d) {
+        if (ev === 'text' && d.text) { cur.text += d.text; }
+        else if (ev === 'thinking' && d.text) { cur.think += d.text; }
+        else if (ev === 'error') { cur.text = (cur.text || '') + '\n\n⚠ ' + (d.message || '出错'); }
+        else if (ev === 'notice') {
+          var nt = (d.text || d.message || '');
+          if (nt) cur.text = (cur.text || '') + (cur.text ? '\n' : '') + '_' + nt + '_';
+        }
+        else if (ev === 'done' || ev === '__end') { CH.busy = false; throttlePaint('practice', true); return; }
+        throttlePaint('practice');
+      });
   }
 
   function pCards(cards) {
@@ -643,6 +774,37 @@
     });
   }
 
+  var DEEP = { out: '', ans: '', busy: false };
+
+  function deepKbRoot() {
+    if (state.kbRoot) return Promise.resolve(state.kbRoot);
+    return fetch('/m/api/status').then(function (r) { return r.json(); })
+      .then(function (j) { state.kbRoot = j.kb || ''; return state.kbRoot; });
+  }
+
+  /** 让籽三讲一遍 / 提交作答纠错（转发给电脑上的主服务） */
+  function deepCoach(stage) {
+    if (!pcMode() || DEEP.busy) return;
+    var kpSel = $('#dpKp');
+    var kp = kpSel ? kpSel.value : '';
+    var ans = ($('#dpAns') && $('#dpAns').value || '').trim();
+    if (stage === 'grade' && !ans) { DEEP.out = '⚠ 先把你的作答写进下面的框，再点纠错。'; renderTab('deep'); return; }
+    DEEP.busy = true; DEEP.ans = ans;
+    DEEP.out = '思考中…';
+    renderTab('deep');
+    deepKbRoot().then(function (root) {
+      postSSE('/m/api/coach', {
+        course: state.course || '', path: root ? (root + '\\' + state.course + '\\' + state.chapter) : '',
+        kp: kp, stage: stage, answer: ans
+      }, function (ev, d) {
+        if (ev === 'text' && d.text) { DEEP.out = (DEEP.out === '思考中…' ? '' : DEEP.out) + d.text; }
+        else if (ev === 'error') { DEEP.out = '⚠ ' + (d.message || '出错'); }
+        else if (ev === 'done' || ev === '__end') { DEEP.busy = false; throttlePaint('deep', true); return; }
+        throttlePaint('deep');
+      });
+    }).catch(function (e) { DEEP.busy = false; DEEP.out = '⚠ ' + e.message; renderTab('deep'); });
+  }
+
   function renderDeep() {
     var plan = (exercises().plan) || {};
     var cards = exercises().cards || [];
@@ -667,6 +829,21 @@
       '　首轮 <b>' + (plan.totalMin || 0) + '</b> 分钟（紧就压到 ' + (plan.shortTotal || 0) + '）' +
       '　·　阶段 <b>' + doneStages + '/' + (plan.stages || []).length + '</b>' +
       '　·　五联卡 <b>' + filled + '/' + cards.length + '</b></div>';
+
+    // 接模型区（仅局域网模式）：讲 + 纠错
+    if (pcMode() && cards.length) {
+      html += '<div class="dlsec">让籽三讲 / 纠错（需要电脑开着）</div>' +
+        '<div class="chhead"><select id="dpKp" class="chsel">' +
+        cards.map(function (c) { return '<option value="' + esc(c.kp) + '">' + esc(c.kp) + '</option>'; }).join('') +
+        '</select><button class="pbtn pri" id="dpExplain">讲一遍</button>' +
+        '<button class="pbtn" id="dpGrade">提交作答·纠错</button></div>' +
+        '<div id="dpOut" class="dpout">' + (DEEP.out ? md(DEEP.out) : '') + '</div>' +
+        '<textarea id="dpAns" class="chinput" rows="3" placeholder="把你的作答写这里，再点「提交作答·纠错」">' +
+        esc(DEEP.ans || '') + '</textarea>';
+    } else if (!pcMode()) {
+      html += '<div class="dlnote">讲解与纠错要调模型，只在「电脑开着 + 局域网模式」下可用；' +
+        '这里的五联卡、阶段、清单都可以离线做。</div>';
+    }
 
     html += '<div class="dlsec">八阶段（勾掉就是做完了）</div><div class="stages">';
     (plan.stages || []).forEach(function (s) {
@@ -750,6 +927,12 @@
         renderTab('practice');
         return;
       }
+      // 考官 / 费曼：开场与发送
+      if (t.id === 'chStart') { chatSend(PR.game); return; }
+      if (t.id === 'chSend') { chatSend(PR.game); return; }
+      // 深度学习：讲 / 纠错
+      if (t.id === 'dpExplain') { deepCoach('explain'); return; }
+      if (t.id === 'dpGrade') { deepCoach('grade'); return; }
       // 学习进度：导出 / 导入 / 云端恢复
       if (t.getAttribute && t.getAttribute('data-dlexp')) { dlExport(); return; }
       if (t.getAttribute && t.getAttribute('data-dlimp')) {
