@@ -203,3 +203,46 @@ main{padding:12px;max-width:820px;margin:0 auto}
 .scanline{position:absolute;left:8%;right:8%;height:2px;background:linear-gradient(90deg,transparent,#7fd4ff,transparent);
   animation:scanmove 2.2s ease-in-out infinite}
 @keyframes scanmove{0%{top:12%}50%{top:86%}100%{top:12%}}
+
+/* ══════════════════════════════════════════════════════════════════
+   平板 / 宽屏适配（>=820px）：左侧课程树常驻，右侧阅读区更宽更好读
+   ══════════════════════════════════════════════════════════════════ */
+@media (min-width: 820px) {
+  #main {
+    display: grid;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 0 18px 24px;
+  }
+  #home { position: sticky; top: 8px; max-height: calc(100vh - 90px); overflow: auto; }
+  #chapter { min-height: 60vh; }
+  .searchbar { gap: 8px; }
+  /* 阅读区：正文加宽、行距放松、字号略提 */
+  #content { font-size: 16px; line-height: 1.95; max-width: 900px; }
+  #content h1 { font-size: 24px; }
+  #content h2 { font-size: 21px; }
+  #content h3 { font-size: 18px; }
+  #content table { font-size: 14.5px; }
+  .tabs { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: 6px; }
+  .top { padding-left: 18px; padding-right: 18px; }
+  .top .title strong { font-size: 17px; }
+  .dlsec, .pn { font-size: 13px; }
+  .qcard { padding: 18px 20px; }
+  .cloze { font-size: 16px; }
+  .opt { font-size: 15px; }
+}
+
+/* 超宽屏（桌面/横放平板）：三档宽度都好看 */
+@media (min-width: 1200px) {
+  #main { grid-template-columns: minmax(320px, 380px) minmax(0, 1fr); }
+  #content { max-width: 1000px; }
+}
+
+/* 极窄屏兜底：保证不横向滚动 */
+@media (max-width: 360px) {
+  #content { font-size: 15px; }
+  .tabs .tab { padding: 7px 9px; font-size: 12.5px; }
+}

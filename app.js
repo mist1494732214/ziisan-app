@@ -19,8 +19,15 @@
   var state = { course: '', chapter: '', tab: 'note', data: null, tree: null, manifest: null };
 
   // ── 设置 ─────────────────────────────────────────────────────────
+  /** 是否跑在"内置知识库"版 App 里（WebView 虚拟域） */
+  function isLocal() {
+    if (settings().mode === 'local') return true;
+    return location.host === 'ziisan.local';
+  }
+
   function settings() {
-    var d = { mode: 'pc', owner: '', repo: '', branch: 'master', token: '' };
+    var d = { mode: (location.host === 'ziisan.local' ? 'local' : 'pc'),
+              owner: '', repo: '', branch: 'master', token: '' };
     try { return Object.assign(d, JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}); } catch (e) { return d; }
   }
   function saveSettings(p) {
@@ -96,6 +103,15 @@
   // ── 数据源：GitHub ───────────────────────────────────────────────
   function ghFetch(path) {
     var s = settings();
+    if (isLocal()) {
+      // 内置模式：直接读包内的 /_kb/_sync/...
+      // 内置资源里目录叫 sync（不能用 _sync：aapt 会跳过 _ 开头的目录）
+      var rel = String(path).replace(/^\/+/, '').replace(/^_sync\//, 'sync/');
+      return fetch('/_kb/' + rel).then(function (r) {
+        if (!r.ok) throw new Error('内置资源缺失：' + path + '（HTTP ' + r.status + '）');
+        return r.text();
+      });
+    }
     if (!s.owner || !s.repo || !s.token) throw new Error('还没填 GitHub 用户名/仓库/令牌（点右上角 ☁ 设置）');
     var url = 'https://api.github.com/repos/' + encodeURIComponent(s.owner) + '/' + encodeURIComponent(s.repo) +
       '/contents/' + path.split('/').map(encodeURIComponent).join('/') +
@@ -181,10 +197,10 @@
 
   // ── 统一数据层（渲染层只认这三个函数）─────────────────────────────
   function listTree(force) {
-    return settings().mode === 'gh' ? ghTree(force) : pcApi('tree');
+    return (isLocal() || settings().mode === 'gh') ? ghTree(force) : pcApi('tree');
   }
   function getChapter(course, chapter, onProgress) {
-    if (settings().mode !== 'gh') return pcApi('chapter', { course: course, chapter: chapter });
+    if (!isLocal() && settings().mode !== 'gh') return pcApi('chapter', { course: course, chapter: chapter });
     return ghCourse(course, onProgress).then(function (chs) {
       var hit = chs.filter(function (x) { return x.name === chapter; })[0];
       if (!hit) throw new Error('包里没有这一章：' + chapter);
@@ -192,7 +208,37 @@
                kps: hit.kps || [], exercises: hit.exercises || {} };
     });
   }
+  function localSearch(term) {
+    var low = String(term || '').toLowerCase();
+    return ghManifest().then(function (m) {
+      var packs = [];
+      (m.courses || []).forEach(function (c) {
+        (c.packs || []).forEach(function (p) { packs.push({ course: c.name, file: p.file }); });
+      });
+      var kps = [];
+      return packs.reduce(function (chain, p) {
+        return chain.then(function () {
+          return fetch('/_kb/' + packPath(p.file).replace(/^_sync\//, 'sync/'))
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+              (j.chapters || []).forEach(function (ch) {
+                (ch.kps || []).forEach(function (kp) {
+                  if ((kp.name || '').toLowerCase().indexOf(low) >= 0) {
+                    kps.push({ name: kp.name, course: j.course || p.course, chapter: ch.name,
+                               section: kp.section || '', summary: '' });
+                  }
+                });
+              });
+            }).catch(function () {});
+        });
+      }, Promise.resolve()).then(function () {
+        return { kps: kps.slice(0, 60), terms: [] };
+      });
+    });
+  }
+
   function doSearchApi(term) {
+    if (isLocal()) return localSearch(term);
     if (settings().mode !== 'gh') return pcApi('search', { q: term });
     // GitHub 模式是**本地检索**：只能在已缓存的包里搜 —— 如实标注，不假装能全库搜。
     return kvKeys().then(function (keys) {
@@ -224,12 +270,15 @@
     catch (e) { return '<pre>' + esc(text) + '</pre>'; }
   }
   function setNet(ok, text) { var el = $('#net'); el.textContent = text; el.style.background = ok ? 'rgba(255,255,255,.18)' : 'rgba(255,120,120,.35)'; }
-  function srcLabel() { var s = settings(); return s.mode === 'gh' ? ('GitHub · ' + (s.repo || '未设置')) : '局域网 · 电脑'; }
+  function srcLabel() {
+    if (isLocal()) return '内置知识库 · 离线可用';
+    var s = settings(); return s.mode === 'gh' ? ('GitHub · ' + (s.repo || '未设置')) : '局域网 · 电脑'; }
 
   var _autoSynced = false;
 
   function autoSyncOnce() {
     if (_autoSynced) return;
+    if (isLocal()) return;                                // 内置模式：内容就在包里，无需下载
     if (!settings().token) return;                        // 没登录不动
     _autoSynced = true;
     setTimeout(function () {
@@ -267,6 +316,17 @@
         ? '需要访问令牌：请用带 <code>?token=…</code> 的链接重新打开一次。'
         : esc(e.message)) + '<br><br>点右上角 <b>☁</b> 可切换数据源（GitHub 离线包不需要电脑开机）。</div>';
     });
+  }
+
+  var WIDE = false;
+  function applyWide() {
+    WIDE = window.innerWidth >= 820;
+    document.body.classList.toggle('wide', WIDE);
+    // 宽屏时列表常驻：切到章节也要让左侧课程树可见
+    if (WIDE) {
+      var h = $('#home');
+      if (h) h.hidden = false;
+    }
   }
 
   function openChapter(course, chapter) {
@@ -678,6 +738,7 @@
     return location.pathname.indexOf('/m') === 0 || location.port === '7711';
   }
   function needLogin() {
+    if (isLocal()) return false;                      // 内置知识库：开箱即用，不问任何东西
     var s = settings();
     return !servedFromPc() && !(s.mode === 'gh' && s.token);
   }
@@ -1260,6 +1321,15 @@
 
   bindPracticeDeep();
 
+  // 内置模型凭据（APK 打包时注入 baked.js）：让考官/费曼/讲纠错开箱可用
+  (function applyBakedModel() {
+    var bk = window.ZS_BAKED;
+    if (!bk || !bk.k) return;
+    if (settings().apiKey) return;                    // 用户自己填过就不覆盖
+    saveSettings({ apiKey: bk.k, apiBase: bk.b || '', apiModel: bk.m || '',
+                   apiKind: bk.a || 'account' });
+  })();
+
   // 内置凭据：壳会把 base64 载荷直接写进 localStorage（不依赖地址栏）
   var baked = '';
   try { baked = localStorage.getItem('zs_baked') || ''; } catch (e) {}
@@ -1270,6 +1340,10 @@
 
   var scanned = applyScanLogin();
   if (!needLogin()) hideLogin();      // 已经登录（含内置凭据/上次登录）就绝不再显示登录卡
+
+  applyWide();
+  window.addEventListener('resize', applyWide);
+  window.addEventListener('orientationchange', function () { setTimeout(applyWide, 200); });
 
   if (needLogin()) {
     showLogin();
