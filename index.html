@@ -62,6 +62,8 @@
     <input id="lgToken" type="password" placeholder="只读令牌（Fine-grained · Contents: Read）" autocapitalize="off" autocomplete="off">
     <p class="hint">令牌只存在这台手机的浏览器里。建议去 GitHub 建一个
       <b>Fine-grained token</b>，只勾 <b>这一个仓库</b> 的 <b>Contents: Read-only</b>。</p>
+    <p class="hint">嫌麻烦？在<b>电脑上</b>运行 <code>python mobile-app/make_qr.py</code>，
+      用手机<b>扫一下二维码</b>——用户名、仓库、令牌、模型 Key 会<b>一次填好</b>，你什么都不用输入。</p>
     <div class="row">
       <button id="lgGo" class="btn">登录并同步</button>
       <button id="lgLan" class="btn ghost">改用局域网</button>

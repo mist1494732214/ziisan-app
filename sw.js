@@ -10,7 +10,7 @@
      · 内容：app.js 自己用 IndexedDB 缓存（GitHub 模式下跨域到 api.github.com，
              SW 不碰跨域请求，免得把令牌相关响应固化下来）
 */
-const VER = 'zs-app-7a9125268b';
+const VER = 'zs-app-8c2d1001c3';
 const SHELL = [
   './', './index.html', './app.js', './prompts.js', './style.css', './manifest.webmanifest',
   './icon.svg', './vendor/marked.umd.js',
