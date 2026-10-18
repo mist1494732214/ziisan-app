@@ -398,6 +398,157 @@
     r.addEventListener('change', function () { $('#ghFields').hidden = (r.value !== 'gh' || !r.checked); });
   });
 
+  // ══════════════════════════════════════════════════════════════════
+  //  直连模型（联网即可，不需要电脑）：api.deepseek.com 允许浏览器调用
+  //  提示词来自 prompts.js（Python 侧导出，唯一真相）
+  // ══════════════════════════════════════════════════════════════════
+  function modelReady() {
+    var s = settings();
+    return !!(s.apiKey && s.apiBase && s.apiModel);
+  }
+
+  function apiHeaders(key, kind) {
+    var h = { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' };
+    if (kind === 'api_key') h['x-api-key'] = key; else h['x-dsh-auth-token'] = key;
+    return h;
+  }
+
+  function fillTpl(tpl, map) {
+    return String(tpl || '').replace(/@@([A-Z]+)@@/g, function (_, k) { return map[k] != null ? map[k] : ''; });
+  }
+
+  /**
+   * 直连 Anthropic 兼容接口（SSE 流式）。
+   * @param {string} system 系统提示
+   * @param {Array}  msgs   [{role,content}]
+   * @param {Array}  pms    prompts 对象
+   * @param {function} onEvent(name, data)
+   */
+  function callModel(system, msgs, onEvent) {
+    var s = settings();
+    var url = String(s.apiBase || '').replace(/\/+$/, '') + '/v1/messages';
+    var hdrs = {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01'
+    };
+    // account 档用自定义头（官方免密钥端点），api_key 档用 x-api-key —— 实测两者跨域都放行
+    if (s.apiKind === 'api_key') hdrs['x-api-key'] = s.apiKey;
+    else hdrs['x-dsh-auth-token'] = s.apiKey;
+    fetch(url, {
+      method: 'POST',
+      headers: hdrs,
+      body: JSON.stringify({
+        model: s.apiModel,
+        max_tokens: 8192,          // 推理模型预算要给足，给小会"只思考不出正文"
+        stream: true,
+        system: system,
+        messages: msgs
+      })
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          var m = t;
+          try { m = JSON.parse(t).error.message || t; } catch (e) {}
+          throw new Error('模型返回 ' + res.status + '：' + String(m).slice(0, 160));
+        });
+      }
+      var reader = res.body.getReader();
+      var dec = new TextDecoder('utf-8');
+      var buf = '';
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) { onEvent('done', {}); return; }
+          buf += dec.decode(r.value, { stream: true });
+          var i;
+          while ((i = buf.indexOf('\n\n')) >= 0) {
+            var chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+            var ev = '', data = '';
+            chunk.split('\n').forEach(function (ln) {
+              if (ln.indexOf('event: ') === 0) ev = ln.slice(7).trim();
+              else if (ln.indexOf('data: ') === 0) data += ln.slice(6);
+            });
+            if (!data) continue;
+            var d;
+            try { d = JSON.parse(data); } catch (e) { continue; }
+            if (ev === 'content_block_delta' && d.delta) {
+              if (d.delta.type === 'text_delta' && d.delta.text) onEvent('text', { text: d.delta.text });
+              else if (d.delta.type === 'thinking_delta' && d.delta.thinking) onEvent('thinking', { text: d.delta.thinking });
+            } else if (ev === 'error') {
+              onEvent('error', { message: (d.error && d.error.message) || '模型报错' });
+            }
+          }
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (e) { onEvent('error', { message: e.message }); });
+  }
+
+  /** 统一入口：电脑开着就用电脑（不花手机的钱），否则直连模型 */
+  function askModel(kind, opts, onEvent) {
+    var P = window.ZS_PROMPTS || {};
+    if (pcMode()) {
+      // 走电脑（主服务有一份完整实现 + 会话记忆）
+      postSSE('/m/api/' + (kind === 'socratic' || kind === 'feynman' ? kind : 'coach'),
+              opts.body || {}, onEvent);
+      return;
+    }
+    if (!modelReady()) {
+      onEvent('error', { message: '要联网用模型，需要两样之一：①电脑开着（局域网模式）②在设置里填模型 Key（或扫码登录一次自动填好）' });
+      return;
+    }
+    var map = {
+      SCOPE: opts.scope || '', KP: opts.kp || '', TEXT: opts.text || '',
+      COURSE: opts.course || '', CHAPTER: opts.chapter || '', ANSWER: opts.answer || ''
+    };
+    var sys, user;
+    if (kind === 'socratic') {
+      sys = fillTpl(P.socraticSystem, map) +
+        ((opts.scope || opts.kp) ? ('\n\n本次考核范围：' + (opts.scope || '') + (opts.kp ? ('｜起点知识点：' + opts.kp) : '')) : '');
+      user = opts.text || fillTpl(P.socraticKickoff, map);
+    } else if (kind === 'feynman') {
+      sys = fillTpl(P.feynmanSystem, map);
+      user = fillTpl(P.feynmanTurn, map);
+    } else if (opts.stage === 'grade') {
+      sys = fillTpl(P.coachGradeSystem, map);
+      user = fillTpl(P.coachGradeUser, map);
+    } else {
+      sys = fillTpl(P.coachExplainSystem, map);
+      user = fillTpl(P.coachExplainUser, map);
+    }
+    callModel(sys, [{ role: 'user', content: user }], onEvent);
+  }
+
+  // ── 扫码登录：URL #k=<base64url(JSON)> ────────────────────────────
+  function applyScanLogin() {
+    var h = location.hash || '';
+    var m = h.match(/[#&]k=([A-Za-z0-9\-_]+)/);
+    if (!m) return false;
+    try {
+      var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var obj = JSON.parse(new TextDecoder('utf-8').decode(bytes));
+      var patch = { mode: 'gh' };
+      if (obj.o) patch.owner = obj.o;
+      if (obj.r) patch.repo = obj.r;
+      if (obj.t) patch.token = obj.t;
+      if (obj.k) patch.apiKey = obj.k;
+      if (obj.b) patch.apiBase = obj.b;
+      if (obj.m) patch.apiModel = obj.m;
+      if (obj.a) patch.apiKind = obj.a;
+      saveSettings(patch);
+      // 抹掉地址里的载荷（不留历史）
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      return true;
+    } catch (e) {
+      console.warn('[籽三] 扫码载荷解析失败：', e);
+      return false;
+    }
+  }
+
   // ── 首次登录（A 方案：只读令牌）────────────────────────────────
   // 判定"要不要先登录"：没有 GitHub 令牌，且当前不是从电脑的局域网服务打开。
   // 局域网模式（/m/）由服务端令牌兜底，不需要这一层。
@@ -654,8 +805,10 @@
     var cur = { role: 'assistant', text: '', think: '' };
     CH.msgs.push(cur);
     renderTab('practice');
-    postSSE(kind === 'socratic' ? '/m/api/socratic' : '/m/api/feynman',
-      { text: text, kp: kp, scope: (state.chapter ? ((state.course || '') + ' / ' + state.chapter) : '') },
+    var scope = state.chapter ? ((state.course || '') + ' / ' + state.chapter) : '';
+    askModel(kind === 'socratic' ? 'socratic' : 'feynman',
+      { scope: scope, kp: kp, text: text,
+        body: { text: text, kp: kp, scope: scope } },
       function (ev, d) {
         if (ev === 'text' && d.text) { cur.text += d.text; }
         else if (ev === 'thinking' && d.text) { cur.think += d.text; }
@@ -793,9 +946,12 @@
     DEEP.out = '思考中…';
     renderTab('deep');
     deepKbRoot().then(function (root) {
-      postSSE('/m/api/coach', {
-        course: state.course || '', path: root ? (root + '\\' + state.course + '\\' + state.chapter) : '',
-        kp: kp, stage: stage, answer: ans
+      askModel('coach', {
+        course: state.course || '', chapter: state.chapter || '', kp: kp,
+        stage: stage, answer: ans,
+        body: { course: state.course || '',
+                path: root ? (root + '\\' + state.course + '\\' + state.chapter) : '',
+                kp: kp, stage: stage, answer: ans }
       }, function (ev, d) {
         if (ev === 'text' && d.text) { DEEP.out = (DEEP.out === '思考中…' ? '' : DEEP.out) + d.text; }
         else if (ev === 'error') { DEEP.out = '⚠ ' + (d.message || '出错'); }
@@ -981,6 +1137,8 @@
   };
 
   bindPracticeDeep();
+
+  var scanned = applyScanLogin();
 
   if (needLogin()) {
     showLogin();
