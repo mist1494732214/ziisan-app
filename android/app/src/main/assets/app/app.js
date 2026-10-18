@@ -105,7 +105,9 @@
     var s = settings();
     if (isLocal()) {
       // 内置模式：直接读包内的 /_kb/_sync/...
-      return fetch('/_kb/' + String(path).replace(/^\/+/, '')).then(function (r) {
+      // 内置资源里目录叫 sync（不能用 _sync：aapt 会跳过 _ 开头的目录）
+      var rel = String(path).replace(/^\/+/, '').replace(/^_sync\//, 'sync/');
+      return fetch('/_kb/' + rel).then(function (r) {
         if (!r.ok) throw new Error('内置资源缺失：' + path + '（HTTP ' + r.status + '）');
         return r.text();
       });
@@ -216,7 +218,8 @@
       var kps = [];
       return packs.reduce(function (chain, p) {
         return chain.then(function () {
-          return fetch('/_kb/' + packPath(p.file)).then(function (r) { return r.json(); })
+          return fetch('/_kb/' + packPath(p.file).replace(/^_sync\//, 'sync/'))
+            .then(function (r) { return r.json(); })
             .then(function (j) {
               (j.chapters || []).forEach(function (ch) {
                 (ch.kps || []).forEach(function (kp) {
