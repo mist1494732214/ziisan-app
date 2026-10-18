@@ -1,0 +1,16 @@
+{
+  "name": "籽三 · 学习库（只读）",
+  "short_name": "籽三",
+  "description": "手机只读查看籽三医学知识库：课程树、章节笔记、思考题解析、知识点检索",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5FAFD",
+  "theme_color": "#23384E",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
