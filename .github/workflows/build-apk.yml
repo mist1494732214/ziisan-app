@@ -1,9 +1,16 @@
 name: build-apk
 
 # 云端构建安卓 APK（公开仓库，Actions 免费）
-# 产物：**固定签名的 release APK**（可覆盖升级），发到 Release 供手机直接下载。
+# · 普通构建：只有壳，登录靠扫码/手填
+# · 内置登录：若仓库配了临时 Secret ZS_LOGIN_PAYLOAD（用完就删），
+#   会把登录载荷编进 BuildConfig.BAKED_URL —— 那种包**只能私下交付，不能发 Release**。
 on:
   workflow_dispatch:
+    inputs:
+      bake_login:
+        description: '把 ZS_LOGIN_PAYLOAD 编进 APK（私用包，不发 Release）'
+        type: boolean
+        default: false
   push:
     paths:
       - 'android/**'
@@ -13,10 +20,10 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     permissions:
-      contents: write               # 建 Release 用
+      contents: write
     env:
       GRADLE_VER: '8.7'
-      ZS_VERSION_CODE: ${{ github.run_number }}   # versionCode 单调递增，手机才能覆盖升级
+      ZS_VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,8 +32,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # ⚠ 不用 runner 预装的 Gradle（当前 9.x）：AGP 8.1.4 依赖的 DependencyHandler.module()
-      #   在 Gradle 9 已移除，且 Gradle 9 在**配置阶段**加载 AGP 就崩，连 `gradle wrapper` 都跑不到。
+      # ⚠ 不用 runner 预装的 Gradle 9.x：与 AGP 8.1.4 不兼容，且配置阶段就崩，
+      #   连 `gradle wrapper` 都跑不到（2026-10-18 实测）。
       - name: 安装 Gradle ${{ env.GRADLE_VER }}
         run: |
           set -euo pipefail
@@ -34,21 +41,33 @@ jobs:
           curl -fsSL -o gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VER}-bin.zip"
           unzip -q gradle.zip
           echo "$HOME/gradle-${GRADLE_VER}/bin" >> "$GITHUB_PATH"
-          "$HOME/gradle-${GRADLE_VER}/bin/gradle" --version | head -6
 
-      # 固定签名钥匙（base64 存 Secrets；公开仓库的 Secrets 同样是加密的）
       - name: 还原签名钥匙
         env:
           KEYSTORE_B64: ${{ secrets.ZS_KEYSTORE_B64 }}
         run: |
           set -euo pipefail
           if [ -z "${KEYSTORE_B64:-}" ]; then
-            echo "::error::缺少 secret ZS_KEYSTORE_B64 —— 请按 mobile-app 文档配置签名钥匙"
+            echo "::error::缺少 secret ZS_KEYSTORE_B64"
             exit 1
           fi
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ziisan-release.jks"
           echo "ZS_KEYSTORE=$RUNNER_TEMP/ziisan-release.jks" >> "$GITHUB_ENV"
-          ls -l "$RUNNER_TEMP/ziisan-release.jks"
+
+      # 内置登录：只有手动触发且勾了 bake_login 时才注入（绝不打印内容）
+      - name: 注入内置登录载荷（可选）
+        if: github.event_name == 'workflow_dispatch' && inputs.bake_login
+        env:
+          PAYLOAD: ${{ secrets.ZS_LOGIN_PAYLOAD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PAYLOAD:-}" ]; then
+            echo "::error::勾了 bake_login 但没有 ZS_LOGIN_PAYLOAD secret"
+            exit 1
+          fi
+          echo "::add-mask::$PAYLOAD"
+          printf 'ZS_BAKED_URL=%s\n' "$PAYLOAD" >> "$GITHUB_ENV"
+          echo "已注入内置登录载荷（长度 ${#PAYLOAD}）"
 
       - name: 构建 release APK（固定签名）
         working-directory: android
@@ -63,7 +82,7 @@ jobs:
           set -euo pipefail
           ls -lh android/app/build/outputs/apk/release/
           if ls android/app/build/outputs/apk/release/ | grep -qi unsigned; then
-            echo "::error::产出是 unsigned 包 —— 签名没生效（检查 Secrets 与 signingConfig）"
+            echo "::error::产出是 unsigned 包"
             exit 1
           fi
           mkdir -p out
@@ -73,12 +92,12 @@ jobs:
           p = "out/ziisan-android.apk"
           with zipfile.ZipFile(p) as z:
               names = z.namelist()
-              dex = [n for n in names if n.startswith("classes") and n.endswith(".dex")]
-              joined = b"".join(z.read(n) for n in dex)
-              print(f"APK {os.path.getsize(p)} 字节｜{len(names)} 条目")
-              print("含 MainActivity：", b"MainActivity" in joined)
-              print("含 Pages 地址：", b"mist1494732214.github.io" in joined)
-              assert b"MainActivity" in joined, "APK 里没有 MainActivity"
+              dex = b"".join(z.read(n) for n in names if n.startswith("classes") and n.endswith(".dex"))
+              man = z.read("AndroidManifest.xml")
+          print(f"APK {os.path.getsize(p)} bytes | {len(names)} entries")
+          print("MainActivity in dex:", b"MainActivity" in dex)
+          print("CAMERA in manifest:", "android.permission.CAMERA".encode("utf-16-le") in man)
+          assert b"MainActivity" in dex
           PY
 
       - uses: actions/upload-artifact@v4
@@ -86,17 +105,13 @@ jobs:
           name: ziisan-android-apk
           path: out/ziisan-android.apk
 
-      - name: 发布到 Release
-        if: github.event_name == 'workflow_dispatch'
+      # 只有"没内置登录"的包才允许发 Release（内置包含凭据，必须私下交付）
+      - name: 发布到 Release（仅普通包）
+        if: github.event_name == 'workflow_dispatch' && !inputs.bake_login
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
           name: 籽三 APK #${{ github.run_number }}
           body: |
-            安卓安装包（固定签名，可**覆盖升级**，不用卸载）。
-
-            安装：手机浏览器打开本页 → 下载 `ziisan-android.apk` → 允许「安装未知来源应用」→ 安装。
-            首次打开：填 GitHub 用户名 / 仓库名 / 只读令牌（详见仓库 README）。
-
-            versionCode：${{ github.run_number }}
+            安卓安装包（固定签名，可覆盖升级）。首次打开用「📷 扫码登录」。
           files: out/ziisan-android.apk

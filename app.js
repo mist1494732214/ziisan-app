@@ -226,6 +226,19 @@
   function setNet(ok, text) { var el = $('#net'); el.textContent = text; el.style.background = ok ? 'rgba(255,255,255,.18)' : 'rgba(255,120,120,.35)'; }
   function srcLabel() { var s = settings(); return s.mode === 'gh' ? ('GitHub · ' + (s.repo || '未设置')) : '局域网 · 电脑'; }
 
+  var _autoSynced = false;
+
+  function autoSyncOnce() {
+    if (_autoSynced) return;
+    if (!settings().token) return;                        // 没登录不动
+    _autoSynced = true;
+    setTimeout(function () {
+      try {
+        if (!state.manifest) { syncAll(); }
+      } catch (e) { /* 同步失败不影响浏览 */ }
+    }, 800);
+  }
+
   function loadHome(force) {
     $('#courses').innerHTML = '<div class="loading">正在读取课程树…</div>';
     $('#sub').textContent = '只读 · ' + srcLabel();
@@ -542,6 +555,10 @@
       saveSettings(patch);
       // 抹掉地址里的载荷（不留历史）
       try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      // 首次登录后**自动把离线资源下下来**（用户要求：打开就能用，不要多余操作）
+      setTimeout(function () {
+        try { if (!state.manifest) { goHome(); loadHome(true); } } catch (e) {}
+      }, 50);
       return true;
     } catch (e) {
       console.warn('[籽三] 扫码载荷解析失败：', e);

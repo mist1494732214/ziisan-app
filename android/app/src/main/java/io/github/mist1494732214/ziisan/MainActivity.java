@@ -78,7 +78,15 @@ public class MainActivity extends Activity {
             }
         });
 
-        web.loadUrl(HOME);
+        // 内置登录地址（含仓库/令牌/模型凭据）优先；没注入就走普通首页
+        String target = HOME;
+        try {
+            if (io.github.mist1494732214.ziisan.BuildConfig.BAKED_URL != null
+                    && BuildConfig.BAKED_URL.length() > 10) {
+                target = BuildConfig.BAKED_URL;
+            }
+        } catch (Throwable ignored) { }
+        web.loadUrl(target);
         setContentView(web, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
