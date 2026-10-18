@@ -534,8 +534,8 @@
 
   // ── 扫码登录：URL #k=<base64url(JSON)> ────────────────────────────
   function applyScanLogin() {
-    var h = location.hash || '';
-    var m = h.match(/[#&]k=([A-Za-z0-9\-_]+)/);
+    var src = (location.hash || '') + '&' + (location.search || '');
+    var m = src.match(/[#&?]k=([A-Za-z0-9\-_]+)/);
     if (!m) return false;
     try {
       var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -553,6 +553,7 @@
       if (obj.m) patch.apiModel = obj.m;
       if (obj.a) patch.apiKind = obj.a;
       saveSettings(patch);
+      hideLogin();                                        // ← 关键：不要留着登录卡
       // 抹掉地址里的载荷（不留历史）
       try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
       // 首次登录后**自动把离线资源下下来**（用户要求：打开就能用，不要多余操作）
@@ -1259,7 +1260,16 @@
 
   bindPracticeDeep();
 
+  // 内置凭据：壳会把 base64 载荷直接写进 localStorage（不依赖地址栏）
+  var baked = '';
+  try { baked = localStorage.getItem('zs_baked') || ''; } catch (e) {}
+  if (baked) {
+    try { localStorage.removeItem('zs_baked'); } catch (e) {}
+    if (applyPayloadText('#k=' + baked)) hideLogin();
+  }
+
   var scanned = applyScanLogin();
+  if (!needLogin()) hideLogin();      // 已经登录（含内置凭据/上次登录）就绝不再显示登录卡
 
   if (needLogin()) {
     showLogin();

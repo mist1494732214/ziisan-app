@@ -10,7 +10,7 @@
      · 内容：app.js 自己用 IndexedDB 缓存（GitHub 模式下跨域到 api.github.com，
              SW 不碰跨域请求，免得把令牌相关响应固化下来）
 */
-const VER = 'zs-app-6480f93978';
+const VER = 'zs-app-f3a3c75994';
 const SHELL = [
   './', './index.html', './app.js', './prompts.js', './style.css', './manifest.webmanifest',
   './icon.svg', './vendor/marked.umd.js', './vendor/jsQR.js',
@@ -52,14 +52,17 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 外壳：cache-first
+  // 外壳：**网络优先，缓存兜底**。
+  // 为什么不是 cache-first（2026-10-18 改）：内置登录版把凭据放在地址的 #k= 里，
+  // 页面逻辑必须是最新的；cache-first 会让手机一直跑旧 app.js（表现为"打开还是登录卡"）。
+  // 断网时 fetch 失败再回落缓存，离线照样能开。
   e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+    fetch(req).then((res) => {
       if (res && res.status === 200) {
         const copy = res.clone();
         caches.open(VER).then((c) => c.put(req, copy)).catch(() => {});
       }
       return res;
-    }).catch(() => caches.match('./index.html')))
+    }).catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
   );
 });

@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
 
     private static final String HOME = "https://mist1494732214.github.io/ziisan-app/";
     private WebView web;
+    private boolean bakedInjected = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +62,22 @@ public class MainActivity extends Activity {
             }
         });
         web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                // 内置凭据走 localStorage 注入，不依赖地址栏 fragment：
+                // 首次加载完写一次，然后 reload，让页面在新一轮启动时读到它。
+                if (bakedInjected) return;
+                String baked = "";
+                try { baked = BuildConfig.BAKED_URL == null ? "" : BuildConfig.BAKED_URL; }
+                catch (Throwable ignored) { }
+                int i = baked.indexOf("#k=");
+                if (i < 0) return;
+                String code = baked.substring(i + 3);
+                bakedInjected = true;
+                String js = "localStorage.setItem('zs_baked','" + code + "');";
+                view.evaluateJavascript(js, value -> view.reload());
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 Uri u = req.getUrl();
