@@ -549,6 +549,110 @@
     }
   }
 
+  // ── 内置扫码登录（相机 + jsQR，本地解码）────────────────────────────
+  var SCAN = { stream: null, raf: 0, canvas: null, ctx: null, t0: 0 };
+
+  function scanMsg(t) {
+    var el = $('#scanMsg');
+    if (el) el.textContent = t || '';
+  }
+
+  function scanStop() {
+    if (SCAN.raf) { cancelAnimationFrame(SCAN.raf); SCAN.raf = 0; }
+    if (SCAN.stream) {
+      SCAN.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+      SCAN.stream = null;
+    }
+    var v = $('#scanVideo');
+    if (v) v.srcObject = null;
+    var box = $('#scan');
+    if (box) box.hidden = true;
+  }
+
+  /** 从一段文本里取出 #k= 载荷并应用（与 URL 扫码同一条路径） */
+  function applyPayloadText(text) {
+    var m = String(text || '').match(/[#&?]k=([A-Za-z0-9\-_]+)/);
+    if (!m) return false;
+    try {
+      var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var obj = JSON.parse(new TextDecoder('utf-8').decode(bytes));
+      var patch = { mode: 'gh' };
+      if (obj.o) patch.owner = obj.o;
+      if (obj.r) patch.repo = obj.r;
+      if (obj.t) patch.token = obj.t;
+      if (obj.k) patch.apiKey = obj.k;
+      if (obj.b) patch.apiBase = obj.b;
+      if (obj.m) patch.apiModel = obj.m;
+      if (obj.a) patch.apiKind = obj.a;
+      saveSettings(patch);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function scanStart() {
+    var box = $('#scan');
+    if (!box) return;
+    box.hidden = false;
+    scanMsg('正在打开相机…');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      scanMsg('这个环境不支持相机（不是 HTTPS 或被限制）。可改用浏览器版扫码，或在下面手动填一次。');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    }).then(function (stream) {
+      SCAN.stream = stream;
+      var v = $('#scanVideo');
+      v.srcObject = stream;
+      v.setAttribute('playsinline', 'true');
+      v.muted = true;
+      return v.play().then(function () {
+        scanMsg('对准二维码…');
+        SCAN.canvas = SCAN.canvas || document.createElement('canvas');
+        SCAN.ctx = SCAN.canvas.getContext('2d', { willReadFrequently: true });
+        SCAN.t0 = Date.now();
+        scanLoop();
+      });
+    }).catch(function (e) {
+      scanMsg('打不开相机：' + (e && e.message ? e.message : e) +
+        '\n可在手机设置里给「籽三」开相机权限，或改用浏览器版扫码。');
+    });
+  }
+
+  function scanLoop() {
+    var v = $('#scanVideo');
+    if (!v || !SCAN.stream) return;
+    if (Date.now() - SCAN.t0 > 120000) { scanStop(); return; }   // 2 分钟没扫到就退出
+    if (v.readyState >= 2 && v.videoWidth) {
+      var w = Math.min(v.videoWidth, 640);
+      var h = Math.round(v.videoHeight * (w / v.videoWidth));
+      SCAN.canvas.width = w; SCAN.canvas.height = h;
+      SCAN.ctx.drawImage(v, 0, 0, w, h);
+      try {
+        var img = SCAN.ctx.getImageData(0, 0, w, h);
+        var code = window.jsQR ? window.jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' }) : null;
+        if (code && code.data) {
+          if (applyPayloadText(code.data)) {
+            scanStop();
+            hideLogin();
+            goHome();
+            loadHome(true);
+            return;
+          }
+          scanMsg('扫到了，但不是籽三的登录码。请对准电脑上的那张。');
+        }
+      } catch (err) { /* 某些帧解码失败是正常的，继续下一帧 */ }
+    }
+    SCAN.raf = requestAnimationFrame(scanLoop);
+  }
+
   // ── 首次登录（A 方案：只读令牌）────────────────────────────────
   // 判定"要不要先登录"：没有 GitHub 令牌，且当前不是从电脑的局域网服务打开。
   // 局域网模式（/m/）由服务端令牌兜底，不需要这一层。
@@ -1148,6 +1252,10 @@
 
   // 登录卡按钮
   $('#lgGo').addEventListener('click', doLogin);
+  var _ls = $('#lgScan');
+  if (_ls) _ls.addEventListener('click', scanStart);
+  var _sc = $('#scanClose');
+  if (_sc) _sc.addEventListener('click', scanStop);
   $('#lgToken').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
   });

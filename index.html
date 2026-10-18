@@ -51,6 +51,21 @@
   </section>
 </main>
 
+<!-- 扫码登录（相机 + jsQR 本地解码，不依赖外部 App） -->
+<div id="scan" class="sheet scan" hidden>
+  <div class="sheet-card">
+    <h3>扫码登录</h3>
+    <p class="hint">对准电脑上那张二维码。扫到后<b>自动填好一切</b>，不用输入任何东西。</p>
+    <div class="scanbox"><video id="scanVideo" playsinline muted></video>
+      <div class="scanline"></div></div>
+    <div id="scanMsg" class="hint">正在打开相机…</div>
+    <div class="row">
+      <button id="scanClose" class="btn ghost">关闭</button>
+    </div>
+    <p class="hint">相机权限若被拒：手机设置 → 应用 → 籽三 → 权限 → 相机 → 允许；或用「添加到主屏幕」的浏览器版再扫。</p>
+  </div>
+</div>
+
 <!-- 首次启动的登录卡（A 方案：粘一次只读令牌；令牌只存本机） -->
 <div id="login" class="sheet login" hidden>
   <div class="sheet-card">
@@ -65,7 +80,10 @@
     <p class="hint">嫌麻烦？在<b>电脑上</b>运行 <code>python mobile-app/make_qr.py</code>，
       用手机<b>扫一下二维码</b>——用户名、仓库、令牌、模型 Key 会<b>一次填好</b>，你什么都不用输入。</p>
     <div class="row">
-      <button id="lgGo" class="btn">登录并同步</button>
+      <button id="lgScan" class="btn">📷 扫码登录（不用填）</button>
+    </div>
+    <div class="row">
+      <button id="lgGo" class="btn ghost">用上面的信息登录</button>
       <button id="lgLan" class="btn ghost">改用局域网</button>
     </div>
     <div id="lgStatus" class="hint"></div>
@@ -96,6 +114,7 @@
 </div>
 
 <script src="vendor/marked.umd.js"></script>
+<script src="vendor/jsQR.js"></script>
 <script src="prompts.js"></script>
 <script src="app.js"></script>
 </body>
