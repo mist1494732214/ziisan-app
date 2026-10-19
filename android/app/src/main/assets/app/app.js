@@ -380,6 +380,8 @@
     } else if (tab === 'practice') {
       el.innerHTML = renderPractice();
     } else if (tab === 'deep') {
+      if (!DW || typeof DW.idx !== 'number') wizInit();
+      if (!DW._inited) { wizInit(); DW._inited = true; }
       el.innerHTML = renderDeep();
     } else {
       el.innerHTML = d.note ? md(d.note) : '<div class="empty">这一章还没有 知识点笔记.md</div>';
@@ -1275,6 +1277,167 @@
     renderTab('deep');
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  深度学习向导：讲 → 问 → 答 → 纠 → 填 → 下一个（离线，自动推进）
+  // ══════════════════════════════════════════════════════════════════
+  var DW = { idx: 0, step: 'explain', answer: '', last: null };
+
+  function wizItems() { return (exercises().offline || []); }
+
+  function wizCurrent() {
+    var list = wizItems();
+    if (!list.length) return null;
+    if (DW.idx >= list.length) DW.idx = list.length - 1;
+    return list[DW.idx];
+  }
+
+  function wizSaveFlow() {
+    var d = dlLoad();
+    d.flow = { idx: DW.idx, step: DW.step, at: new Date().toISOString() };
+    dlSave(d);
+  }
+
+  function wizInit() {
+    var d = dlLoad();
+    var f = d.flow || {};
+    var list = wizItems();
+    DW.idx = (typeof f.idx === 'number' && f.idx >= 0 && f.idx < list.length) ? f.idx : 0;
+    DW.step = 'explain';        // 进来先"讲"——用户要的就是点入直接开始讲
+    DW.answer = '';
+    DW.last = null;
+  }
+
+  function wizScroll() {
+    try { var c = $('#content'); if (c) c.scrollIntoView({ block: 'start' }); } catch (e) {}
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }
+
+  function wizardHtml() {
+    var list = wizItems();
+    if (!list.length) {
+      return '<div class="dlnote">这一章还没有离线讲解素材（需要更完整的笔记标签）。</div>';
+    }
+    var it = wizCurrent();
+    var n = list.length, i = DW.idx + 1;
+    var pct = Math.round((DW.idx / n) * 100);
+
+    var head = '<div class="wiztop">' +
+      '<div class="wizline"><b>深度学习</b>　知识点 <b>' + i + '/' + n + '</b>' +
+      '<span class="wizstep">' +
+      ['讲', '问', '答', '纠', '填'].map(function (s, k) {
+        var cur = (DW.step === 'explain' && k === 0) || (DW.step === 'ask' && k === 1)
+          || (DW.step === 'graded' && k === 3) || (DW.step === 'fill' && k === 4);
+        var done = (DW.step === 'ask' && k === 0) || (DW.step === 'graded' && k <= 1)
+          || (DW.step === 'fill' && k <= 3);
+        return '<i class="' + (cur ? 'cur' : (done ? 'done' : '')) + '">' + s + '</i>';
+      }).join('') + '</span></div>' +
+      '<div class="wizbar"><span style="width:' + pct + '%"></span></div>' +
+      '<div class="wizkp">' + esc(it.kp) + '</div></div>';
+
+    var body = '';
+    if (DW.step === 'explain') {
+      body = '<div class="wizstep-t">① 先讲清楚（不用你操作，往下看）</div>' +
+        '<div class="dpoff">' + md(it.explain || '（无讲解）') + '</div>' +
+        '<div class="wizacts"><button class="pbtn pri" data-wiz="ask">看懂了，考我 →</button>' +
+        '<button class="pbtn" data-wiz="skip">跳过这个知识点</button></div>';
+    } else if (DW.step === 'ask') {
+      var parts = String(it.skeleton || '').split(/\{\{(\d+)\}\}/);
+      var sk = '';
+      parts.forEach(function (seg) {
+        if (/^\d+$/.test(seg)) sk += '<input class="blk" data-off="' + seg + '" size="10" autocomplete="off">';
+        else if (seg) sk += esc(seg);
+      });
+      body = '<div class="wizstep-t">② 考你一下（把空填上，再用自己的话补一句）</div>' +
+        '<div class="dpask">' + md(it.ask || '') + '</div>' +
+        (sk ? '<div class="cloze">' + sk + '</div>' : '') +
+        '<textarea id="offAns" class="chinput" rows="3" placeholder="用自己的话复述一遍（提到关键判别词）">' +
+        esc(DW.answer || '') + '</textarea>' +
+        '<div class="wizacts"><button class="pbtn pri" data-wiz="grade">提交答案，看对不对 →</button></div>';
+    } else if (DW.step === 'graded') {
+      var r = DW.last || { verdict: '参考', hit: [], miss: [], total: 0, canonical: '' };
+      var cls = r.verdict === '对' ? 'ok' : (r.verdict === '部分对' ? 'mid' : 'bad');
+      body = '<div class="wizstep-t">③ 纠错（不看答案也能自己判）</div>' +
+        '<div class="offres ' + cls + '">' +
+        '<div class="vd">判定：<b>' + esc(r.verdict) + '</b>　关键词命中 ' + (r.hit || []).length + '/' + (r.total || 0) + '</div>' +
+        ((r.hit || []).length ? '<div class="kw">提到了：' + r.hit.map(esc).join('、') + '</div>' : '') +
+        ((r.miss || []).length ? '<div class="kw miss">漏了：' + r.miss.map(esc).join('、') + '</div>' : '') +
+        (r.canonical ? '<div class="std"><b>规范表述</b><p>' + esc(r.canonical) + '</p></div>' : '') +
+        '</div>' +
+        '<div class="wizacts"><button class="pbtn pri" data-wiz="fill">填进五联卡 →</button>' +
+        '<button class="pbtn" data-wiz="retry">再答一次</button></div>';
+    } else if (DW.step === 'fill') {
+      var F = [['cause', '病因/诱因'], ['mechanism', '关键机制'], ['gross', '大体'],
+               ['micro', '镜下'], ['clinic', '临床联系'], ['outcome', '结局/转归'], ['confuse', '易混点']];
+      var dd = dlLoad();
+      var saved = (dd.cards || {})[it.kp] || {};
+      body = '<div class="wizstep-t">④ 填进框架（写多短都行，写下来才算你的）</div>' +
+        '<div id="wizFill">' +
+        '<details class="card" open><summary>参照：规范表述（可边看边写）</summary>' +
+        '<div class="cf"><p>' + esc(it.canonical || '') + '</p></div></details>' +
+        F.map(function (f) {
+          var v = saved[f[0]] || '';
+          return '<div class="cf"><span>' + f[1] + '</span>' +
+            '<textarea rows="2" data-dl="' + esc(it.kp) + '" data-f="' + f[0] + '" ' +
+            'placeholder="（待补）">' + esc(v) + '</textarea></div>';
+        }).join('') + '</div>' +
+        '<div class="wizacts"><button class="pbtn pri" data-wiz="next">保存，下一个知识点 →</button>' +
+        '<button class="pbtn" data-wiz="back">再讲一遍</button></div>';
+    }
+
+    var nav = '<div class="wiznav">' +
+      (DW.idx > 0 ? '<button class="pbtn" data-wiz="prev">← 上一个</button>' : '') +
+      (DW.idx < n - 1 ? '<button class="pbtn" data-wiz="nextkp">下一个知识点 →</button>' : '') +
+      '</div>';
+    return head + body + nav;
+  }
+
+  function wizAct(act) {
+    var list = wizItems();
+    var it = wizCurrent();
+    if (!it) return;
+    if (act === 'ask') { DW.step = 'ask'; wizSaveFlow(); renderTab('deep'); wizScroll(); return; }
+    if (act === 'retry') { DW.step = 'ask'; DW.last = null; renderTab('deep'); return; }
+    if (act === 'grade') {
+      var parts = [];
+      Array.prototype.forEach.call(document.querySelectorAll('#content input[data-off]'),
+        function (x) { if (x.value.trim()) parts.push(x.value); });
+      var ta = document.querySelector('#offAns');
+      var text = (ta && ta.value) || '';
+      DW.answer = text;
+      var sc = offScore(parts.join(' ') + ' ' + text, it.terms || []);
+      var verdict = offVerdict(sc.hit.length, sc.total);
+      DW.last = { verdict: verdict, hit: sc.hit, miss: sc.miss, total: sc.total,
+                  canonical: it.canonical || '' };
+      DW.step = 'graded';
+      var d = dlLoad();
+      d.off = d.off || {};
+      d.off[it.kp] = { verdict: verdict, hit: sc.hit.length, total: sc.total,
+                       at: new Date().toISOString() };
+      dlSave(d);
+      wizSaveFlow();
+      renderTab('deep');
+      wizScroll();
+      return;
+    }
+    if (act === 'fill') { DW.step = 'fill'; wizSaveFlow(); renderTab('deep'); wizScroll(); return; }
+    if (act === 'back') { DW.step = 'explain'; wizSaveFlow(); renderTab('deep'); wizScroll(); return; }
+    if (act === 'next' || act === 'nextkp' || act === 'skip') {
+      if (DW.idx < list.length - 1) DW.idx += 1;
+      DW.step = 'explain'; DW.last = null; DW.answer = '';
+      wizSaveFlow();
+      renderTab('deep');
+      wizScroll();
+      return;
+    }
+    if (act === 'prev') {
+      if (DW.idx > 0) DW.idx -= 1;
+      DW.step = 'explain'; DW.last = null; DW.answer = '';
+      wizSaveFlow();
+      renderTab('deep');
+      wizScroll();
+    }
+  }
+
   function renderDeep() {
     var plan = (exercises().plan) || {};
     var cards = exercises().cards || [];
@@ -1300,7 +1463,7 @@
       '　·　阶段 <b>' + doneStages + '/' + (plan.stages || []).length + '</b>' +
       '　·　五联卡 <b>' + filled + '/' + cards.length + '</b></div>';
 
-    html += offHtml();
+    html += wizardHtml();
 
     // 接模型区（电脑走局域网 / 内置版直连）
     if ((pcMode() || modelReady()) && cards.length) {
@@ -1334,7 +1497,8 @@
     });
     html += '</div>';
 
-    html += '<div class="dlsec">五联卡（把空的填上，存在手机里）</div>';
+    html += '<details class="dlfold"><summary>全部五联卡（' + cards.length +
+      ' 张 · 点开可随时改；上面向导里写过的会同步显示）</summary>';
     cards.forEach(function (c, i) {
       var e = (d.cards || {})[c.kp] || {};
       html += '<details class="card"' + (i === 0 ? ' open' : '') + '><summary>' + esc(c.kp) + '</summary>' +
@@ -1345,6 +1509,8 @@
             'placeholder="（待补）">' + esc(v) + '</textarea></div>';
         }).join('') + '</details>';
     });
+
+    html += '</details>';
 
     html += '<div class="dlsec">完成检查清单</div>';
     (plan.checklist || []).forEach(function (ck) {
@@ -1403,6 +1569,9 @@
       // 考官 / 费曼：开场与发送
       if (t.id === 'chStart') { chatSend(PR.game); return; }
       if (t.id === 'chSend') { chatSend(PR.game); return; }
+      // 深度学习向导
+      var wiz = t.getAttribute && t.getAttribute('data-wiz');
+      if (wiz) { wizAct(wiz); return; }
       // 离线深度学习：讲 / 问 / 提交
       var offActName = t.getAttribute && t.getAttribute('data-off-act');
       if (offActName) { offAct(offActName); return; }
