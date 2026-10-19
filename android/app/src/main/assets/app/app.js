@@ -840,8 +840,9 @@
     var ex = exercises();
     var g = PR.game;
     var html = '<div class="pbar">' +
-      ['cloze', 'choice', 'cards', 'socratic', 'feynman'].map(function (k) {
+      ['cloze', 'choice', 'name', 'short', 'essay', 'cards', 'socratic', 'feynman'].map(function (k) {
         var name = { cloze: '挖空', choice: '选择题', cards: '五联卡',
+                     name: '名解', short: '简答', essay: '论述',
                      socratic: '考官', feynman: '费曼' }[k];
         return '<button class="pbtn' + (g === k ? ' on' : '') + '" data-pg="' + k + '">' + name + '</button>';
       }).join('') +
@@ -849,6 +850,7 @@
       '</div>';
     if (g === 'cloze') html += pCloze(ex.cloze || []);
     else if (g === 'choice') html += pChoice(ex.choice || []);
+    else if (g === 'name' || g === 'short' || g === 'essay') html += pSubj(g);
     else if (g === 'socratic' || g === 'feynman') html += pChat(g);
     else html += pCards(ex.cards || []);
     return html;
@@ -967,6 +969,52 @@
     var ks = (state.data && state.data.kps) || [];
     return ks.map(function (k) { return typeof k === 'string' ? k : (k && k.name) || ''; })
       .filter(function (n) { return !!n; });
+  }
+
+  // ── 主观题：名词解释 / 简答题 / 论述题（按题库体例，要点本地判分）──
+  var SU = { kind: 'name', idx: 0, last: null };
+
+  function subjItems(kind) {
+    var ex = exercises();
+    return (ex[kind] || []);
+  }
+
+  function subjVerdict(hit, total) {
+    if (!total) return '参考';
+    if (hit >= total) return '对';
+    if (hit / total >= 0.5) return '部分对';
+    return '错';
+  }
+
+  function pSubj(kind) {
+    var items = subjItems(kind);
+    var label = { name: '名词解释', short: '简答题', essay: '论述题' }[kind];
+    if (SU.kind !== kind) { SU = { kind: kind, idx: 0, last: null }; }
+    if (!items.length) {
+      return '<div class="empty">这一章的「' + label + '」还出不来（需要更完整的笔记标签：定义/机制/分类/考点）。</div>';
+    }
+    var i = Math.min(SU.idx, items.length - 1);
+    var it = items[i];
+    var r = (SU.last && SU.last.i === i) ? SU.last : null;
+    var cls = r ? (r.verdict === '对' ? 'ok' : (r.verdict === '部分对' ? 'mid' : 'bad')) : '';
+    var rows = kind === 'essay' ? 8 : (kind === 'short' ? 5 : 3);
+    return '<div class="pn">第 ' + (i + 1) + ' / ' + items.length + ' 题' +
+      (it.kp ? '　<b>' + esc(it.kp) + '</b>' : '') +
+      (it.fromLabel ? '　考点：' + esc(it.fromLabel) : '') + '</div>' +
+      '<div class="qcard"><div class="stem">' + esc(it.ask || it.stem) + '</div>' +
+      '<textarea id="suAns" class="chinput" rows="' + rows + '" placeholder="' +
+      (kind === 'name' ? '写下定义（书面语，别只写关键词）' :
+       kind === 'short' ? '分点作答，把要点写全' : '先给结论，再分层比较/论述') + '">' +
+      (r ? esc(r.answer) : '') + '</textarea>' +
+      '<div class="pacts"><button class="pbtn pri" data-susub="1">对答案，看评</button>' +
+      '<button class="pbtn" data-sunext="1">下一题 →</button></div>' +
+      (r ? '<div class="offres ' + cls + '">' +
+        '<div class="vd">判定：<b>' + esc(r.verdict) + '</b>　要点命中 ' + r.hit.length + '/' + r.total + '</div>' +
+        (r.hit.length ? '<div class="kw">提到：' + r.hit.map(esc).join('、') + '</div>' : '') +
+        (r.miss.length ? '<div class="kw miss">漏了：' + r.miss.map(esc).join('、') + '</div>' : '') +
+        (it.canonical ? '<div class="std"><b>规范答案</b><p>' + esc(it.canonical) + '</p></div>' : '') +
+        '</div>' : '') +
+      '</div>';
   }
 
   function pChat(kind) {
@@ -1569,6 +1617,26 @@
       // 考官 / 费曼：开场与发送
       if (t.id === 'chStart') { chatSend(PR.game); return; }
       if (t.id === 'chSend') { chatSend(PR.game); return; }
+      // 主观题：对答案 / 下一题
+      if (t.getAttribute && t.getAttribute('data-susub')) {
+        var items = subjItems(SU.kind);
+        var it = items[Math.min(SU.idx, items.length - 1)] || {};
+        var ta = $('#suAns');
+        var ans = (ta && ta.value) || '';
+        var sc = offScore(ans, it.points || []);
+        SU.last = { i: SU.idx, answer: ans, verdict: subjVerdict(sc.hit.length, sc.total),
+                    hit: sc.hit, miss: sc.miss, total: sc.total };
+        renderTab('practice');
+        return;
+      }
+      if (t.getAttribute && t.getAttribute('data-sunext')) {
+        var arr = subjItems(SU.kind);
+        SU.idx = Math.min(SU.idx + 1, Math.max(0, arr.length - 1));
+        SU.last = null;
+        renderTab('practice');
+        return;
+      }
+
       // 深度学习向导
       var wiz = t.getAttribute && t.getAttribute('data-wiz');
       if (wiz) { wizAct(wiz); return; }

@@ -1,20 +1,20 @@
 {
- "generatedAt": "2026-10-19 07:46:58",
+ "generatedAt": "2026-10-19 13:13:17",
  "generator": "ziisan-android-bundle",
  "courses": [
   {
    "name": "病理学",
    "chapters": 17,
-   "bytes": 4893995,
+   "bytes": 6153384,
    "packs": [
     {
      "course": "病理学",
      "file": "pack/p001.json",
-     "bytes": 861215,
-     "sha256": "ffb80e58c5e6f56403b2cbe4306e965dc201d80273ad913a256751b93262960a",
-     "chapters": 4,
+     "bytes": 784905,
+     "sha256": "43fa3bbd59007fd9070bc3967e60a4b76887c52668f5074043a7f079905a6289",
+     "chapters": 3,
      "part": 1,
-     "parts": 7,
+     "parts": 8,
      "chapterIndex": [
       {
        "name": "第一章细胞和组织的适应与损伤",
@@ -30,11 +30,6 @@
        "name": "第三章局部血液循环障碍",
        "taught": true,
        "kps": 17
-      },
-      {
-       "name": "第四章炎症",
-       "taught": true,
-       "kps": 12
       }
      ],
      "origin": "pack/病理学__1.json"
@@ -42,12 +37,17 @@
     {
      "course": "病理学",
      "file": "pack/p002.json",
-     "bytes": 656062,
-     "sha256": "efc484e3fc7498e62896bc8fd494629b8ebe8706f2de34cc59d2c73ab7b9abbc",
+     "bytes": 851109,
+     "sha256": "95207affb16e9fbb0de0d06480b0724523e6d9e481b9806eaf02d492ba699a92",
      "chapters": 3,
      "part": 2,
-     "parts": 7,
+     "parts": 8,
      "chapterIndex": [
+      {
+       "name": "第四章炎症",
+       "taught": true,
+       "kps": 12
+      },
       {
        "name": "第五章免疫性疾病",
        "taught": true,
@@ -57,11 +57,6 @@
        "name": "第六章肿瘤",
        "taught": true,
        "kps": 54
-      },
-      {
-       "name": "第八章遗传性疾病和儿童疾病",
-       "taught": true,
-       "kps": 36
       }
      ],
      "origin": "pack/病理学__2.json"
@@ -69,21 +64,21 @@
     {
      "course": "病理学",
      "file": "pack/p003.json",
-     "bytes": 814778,
-     "sha256": "d0a28218a9e3467d3f1cec078bb6b0ded99e6be9c0f3792f43cb5f3c8223fdda",
+     "bytes": 712162,
+     "sha256": "5398eeb928940e3a638d38b01f83cda9103cd911983f6be0991d54b81be560bd",
      "chapters": 2,
      "part": 3,
-     "parts": 7,
+     "parts": 8,
      "chapterIndex": [
+      {
+       "name": "第八章遗传性疾病和儿童疾病",
+       "taught": true,
+       "kps": 36
+      },
       {
        "name": "第九章心血管系统疾病",
        "taught": true,
        "kps": 86
-      },
-      {
-       "name": "第十章呼吸系统疾病",
-       "taught": true,
-       "kps": 40
       }
      ],
      "origin": "pack/病理学__3.json"
@@ -91,17 +86,34 @@
     {
      "course": "病理学",
      "file": "pack/p004.json",
-     "bytes": 860032,
-     "sha256": "c01922a66f0e76ac365049a4d14dc84b0eecffa7b2d49ec5430007a93b22db86",
-     "chapters": 3,
+     "bytes": 758805,
+     "sha256": "31f611f7664f2eda9007206975aa7b4bda4b1f578a45f9cadb9736c2124e226c",
+     "chapters": 2,
      "part": 4,
-     "parts": 7,
+     "parts": 8,
      "chapterIndex": [
+      {
+       "name": "第十章呼吸系统疾病",
+       "taught": true,
+       "kps": 40
+      },
       {
        "name": "第十一章消化系统疾病",
        "taught": true,
        "kps": 32
-      },
+      }
+     ],
+     "origin": "pack/病理学__4.json"
+    },
+    {
+     "course": "病理学",
+     "file": "pack/p005.json",
+     "bytes": 892949,
+     "sha256": "82f61dd15dbadc2fa4a5b4db7134c8f7f231b537b945d41a58d52881b6c2db10",
+     "chapters": 2,
+     "part": 5,
+     "parts": 8,
+     "chapterIndex": [
       {
        "name": "第十二章淋巴造血系统疾病",
        "taught": true,
@@ -113,16 +125,16 @@
        "kps": 41
       }
      ],
-     "origin": "pack/病理学__4.json"
+     "origin": "pack/病理学__5.json"
     },
     {
      "course": "病理学",
-     "file": "pack/p005.json",
-     "bytes": 660606,
-     "sha256": "252694d509d69bcf73fcd5c2231d01dc4def824165b3fa036e6cebde36f8a05c",
+     "file": "pack/p006.json",
+     "bytes": 860672,
+     "sha256": "5f1d80fe384ccdc9cde85cba29bb5548aae47aea94438f49df8c51922a60b409",
      "chapters": 2,
-     "part": 5,
-     "parts": 7,
+     "part": 6,
+     "parts": 8,
      "chapterIndex": [
       {
        "name": "第十四章生殖系统和乳腺疾病",
@@ -135,62 +147,62 @@
        "kps": 47
       }
      ],
-     "origin": "pack/病理学__5.json"
-    },
-    {
-     "course": "病理学",
-     "file": "pack/p006.json",
-     "bytes": 763374,
-     "sha256": "e0a2f07328ec84e55312a33fc5375a5435d5cde282f67f0e451bb08be1ac89f8",
-     "chapters": 2,
-     "part": 6,
-     "parts": 7,
-     "chapterIndex": [
-      {
-       "name": "第十六章神经系统疾病",
-       "taught": true,
-       "kps": 67
-      },
-      {
-       "name": "第十七章骨关节和软组织疾病",
-       "taught": true,
-       "kps": 23
-      }
-     ],
      "origin": "pack/病理学__6.json"
     },
     {
      "course": "病理学",
      "file": "pack/p007.json",
-     "bytes": 277928,
-     "sha256": "605612c6fc7ea12abac27571d2c805fddacd44099371d10ae25ecaefab96ca20",
+     "bytes": 739586,
+     "sha256": "3a0e026d8363061acb1fb86f1cda1381dcee4e886889b2fd46a322992f6e1334",
      "chapters": 1,
      "part": 7,
-     "parts": 7,
+     "parts": 8,
      "chapterIndex": [
+      {
+       "name": "第十六章神经系统疾病",
+       "taught": true,
+       "kps": 67
+      }
+     ],
+     "origin": "pack/病理学__7.json"
+    },
+    {
+     "course": "病理学",
+     "file": "pack/p008.json",
+     "bytes": 553196,
+     "sha256": "28656a2b8b2abd056b9c634511b9655a8c00d566e2f51e314d42aac4a043a115",
+     "chapters": 2,
+     "part": 8,
+     "parts": 8,
+     "chapterIndex": [
+      {
+       "name": "第十七章骨关节和软组织疾病",
+       "taught": true,
+       "kps": 23
+      },
       {
        "name": "第十八章传染病",
        "taught": true,
        "kps": 44
       }
      ],
-     "origin": "pack/病理学__7.json"
+     "origin": "pack/病理学__8.json"
     }
    ]
   },
   {
    "name": "病理生理学",
    "chapters": 20,
-   "bytes": 5375166,
+   "bytes": 6405777,
    "packs": [
     {
      "course": "病理生理学",
-     "file": "pack/p008.json",
-     "bytes": 821267,
-     "sha256": "1418b8ed5e70183c73db796063f725d41de67cb6e7e743efdd5abbd3b3b2eba9",
-     "chapters": 5,
+     "file": "pack/p009.json",
+     "bytes": 775696,
+     "sha256": "b429ba5440037d18add8af36606a7345d310132919d2661f89d8d939e3a1d06e",
+     "chapters": 4,
      "part": 1,
-     "parts": 7,
+     "parts": 9,
      "chapterIndex": [
       {
        "name": "第一章绪论",
@@ -211,29 +223,41 @@
        "name": "第四章细胞信号转导与疾病",
        "taught": true,
        "kps": 27
-      },
-      {
-       "name": "第五章衰老与疾病",
-       "taught": true,
-       "kps": 23
       }
      ],
      "origin": "pack/病理生理学__1.json"
     },
     {
      "course": "病理生理学",
-     "file": "pack/p009.json",
-     "bytes": 763914,
-     "sha256": "f2e401c8dc593584806eb041b15a317653e638fa26e7fce5eaf03cbccfaa580c",
-     "chapters": 3,
+     "file": "pack/p010.json",
+     "bytes": 591161,
+     "sha256": "41018b401ece18e38418ad740903231c51668bf5744775d2e3edbe60994d758c",
+     "chapters": 2,
      "part": 2,
-     "parts": 7,
+     "parts": 9,
      "chapterIndex": [
+      {
+       "name": "第五章衰老与疾病",
+       "taught": true,
+       "kps": 23
+      },
       {
        "name": "第六章应激",
        "taught": true,
        "kps": 36
-      },
+      }
+     ],
+     "origin": "pack/病理生理学__2.json"
+    },
+    {
+     "course": "病理生理学",
+     "file": "pack/p011.json",
+     "bytes": 598208,
+     "sha256": "0235a79e2d468d89c50e4a2382970341670fb123b64897d16e5130bc76d906ab",
+     "chapters": 2,
+     "part": 3,
+     "parts": 9,
+     "chapterIndex": [
       {
        "name": "第七章水、电解质代谢紊乱",
        "taught": true,
@@ -245,16 +269,16 @@
        "kps": 28
       }
      ],
-     "origin": "pack/病理生理学__2.json"
+     "origin": "pack/病理生理学__3.json"
     },
     {
      "course": "病理生理学",
-     "file": "pack/p010.json",
-     "bytes": 864732,
-     "sha256": "f0062d2b56516b8736a5b628e76958eb86b03c59fa71df99d88f1f4b1903fbdc",
-     "chapters": 3,
-     "part": 3,
-     "parts": 7,
+     "file": "pack/p012.json",
+     "bytes": 728864,
+     "sha256": "e3d21ffb962ff719eeac6e473dcc816cb2cc0f6ac633be89ae27f33c1515c203",
+     "chapters": 2,
+     "part": 4,
+     "parts": 9,
      "chapterIndex": [
       {
        "name": "第九章糖脂代谢紊乱",
@@ -265,29 +289,41 @@
        "name": "第十章缺氧",
        "taught": true,
        "kps": 31
-      },
+      }
+     ],
+     "origin": "pack/病理生理学__4.json"
+    },
+    {
+     "course": "病理生理学",
+     "file": "pack/p013.json",
+     "bytes": 666889,
+     "sha256": "f315c9d8489146fdadba2d520759cb2b34d77d68ef14057cf2bf1f5d430bf2f6",
+     "chapters": 2,
+     "part": 5,
+     "parts": 9,
+     "chapterIndex": [
       {
        "name": "第十一章发热",
        "taught": true,
        "kps": 48
-      }
-     ],
-     "origin": "pack/病理生理学__3.json"
-    },
-    {
-     "course": "病理生理学",
-     "file": "pack/p011.json",
-     "bytes": 901246,
-     "sha256": "268b10a476f3ffd67772bffeac529eb3fa1a32b001d48cbe8ab892da56d5b4fa",
-     "chapters": 3,
-     "part": 4,
-     "parts": 7,
-     "chapterIndex": [
+      },
       {
        "name": "第十二章缺血 - 再灌注损伤",
        "taught": true,
        "kps": 47
-      },
+      }
+     ],
+     "origin": "pack/病理生理学__5.json"
+    },
+    {
+     "course": "病理生理学",
+     "file": "pack/p014.json",
+     "bytes": 712422,
+     "sha256": "c029148221fbae81f0c8c599aa8061b4329133d94200bd100248e60612a17af0",
+     "chapters": 2,
+     "part": 6,
+     "parts": 9,
+     "chapterIndex": [
       {
        "name": "第十三章休克",
        "taught": true,
@@ -299,16 +335,16 @@
        "kps": 55
       }
      ],
-     "origin": "pack/病理生理学__4.json"
+     "origin": "pack/病理生理学__6.json"
     },
     {
      "course": "病理生理学",
-     "file": "pack/p012.json",
-     "bytes": 692699,
-     "sha256": "b84ee0a16afdefda2b82cd6fdfcdae3e196abcc48d4784316f7274281c82655d",
+     "file": "pack/p015.json",
+     "bytes": 812626,
+     "sha256": "1ad59859b4eaeb5bdd4ebf56ce5d9b8e1c2d53346296eee231b54275702f27a7",
      "chapters": 2,
-     "part": 5,
-     "parts": 7,
+     "part": 7,
+     "parts": 9,
      "chapterIndex": [
       {
        "name": "第十五章心功能不全",
@@ -321,16 +357,16 @@
        "kps": 44
       }
      ],
-     "origin": "pack/病理生理学__5.json"
+     "origin": "pack/病理生理学__7.json"
     },
     {
      "course": "病理生理学",
-     "file": "pack/p013.json",
-     "bytes": 676825,
-     "sha256": "931b95e42cacf4e8babd4466cfd870f7ee9c7d4cf4a9606fe0181964e6a34be4",
+     "file": "pack/p016.json",
+     "bytes": 773074,
+     "sha256": "fd07f444cbe8b96d6500345ac855194281ebf11f2a6dc652359001f18e763f33",
      "chapters": 2,
-     "part": 6,
-     "parts": 7,
+     "part": 8,
+     "parts": 9,
      "chapterIndex": [
       {
        "name": "第十七章肝功能不全",
@@ -343,16 +379,16 @@
        "kps": 76
       }
      ],
-     "origin": "pack/病理生理学__6.json"
+     "origin": "pack/病理生理学__8.json"
     },
     {
      "course": "病理生理学",
-     "file": "pack/p014.json",
-     "bytes": 654483,
-     "sha256": "faa9a0449109e342d26ff9deebc973b608f6056b9778d4b5cbb90f22242553ef",
+     "file": "pack/p017.json",
+     "bytes": 746837,
+     "sha256": "507d28f23183bd81423e38da76e5ddf1eef3aa93759c360f1a086bee2cd312bc",
      "chapters": 2,
-     "part": 7,
-     "parts": 7,
+     "part": 9,
+     "parts": 9,
      "chapterIndex": [
       {
        "name": "第十九章脑功能不全",
@@ -365,7 +401,7 @@
        "kps": 53
       }
      ],
-     "origin": "pack/病理生理学__7.json"
+     "origin": "pack/病理生理学__9.json"
     }
    ]
   }
